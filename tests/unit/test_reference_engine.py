@@ -23,6 +23,17 @@ class FakeCnModel:
         return [[1.0, 0.0]]
 
 
+class FullFakeCnModel:
+    """返回 25 个虚拟阵元的固定 cn。"""
+
+    def predict(self, features):
+        """参数为 25 行 9 列特征，返回 25 行 cn。"""
+
+        assert len(features) == 25
+        assert all(len(row) == 9 for row in features)
+        return [[1.0 if index == 0 else 0.0, 0.0] for index in range(25)]
+
+
 @pytest.mark.unit
 def test_reference_engine_wires_model_z_ecp_and_total_field():
     """验证模型→Z@cn→ECP→总阵的最小链路。"""
@@ -34,3 +45,17 @@ def test_reference_engine_wires_model_z_ecp_and_total_field():
     assert output["implementation"] == "xgboost_reference"
     assert output["units"]["1"][0]["ECP_dB"] == pytest.approx(0.0)
     assert output["total_array"]["records"][0]["ECP_dB"] == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_reference_engine_supports_full_virtual_array_shape():
+    """验证完整 25 虚拟阵元输出形状，不依赖 xgboost/HFSS。"""
+
+    pattern = [
+        {"Phi[deg]": 0.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0},
+        {"Phi[deg]": 2.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0},
+    ]
+    engine = ReferencePredictionEngine(FullFakeCnModel(), pattern)
+    output = engine.predict(ArrayInput(1, (ArrayUnit(1, 1, 1, 0.0, 0.0),)))
+    assert len(output["units"]["1"]) == 2
+    assert len(output["total_array"]["records"]) == 2

@@ -15,6 +15,7 @@
 - 模型输入特征 → cn 实/虚部 → `Z@cn` → 单元 ECP → 总阵合成的依赖方向。
 - 模型和平均 ECP 通过构造函数注入，不连接 HFSS、不读取绝对路径。
 - 最小 FakeCnModel 链路测试通过。
+- 完整 25 虚拟阵元形状通过 FakeCnModel 测试，不依赖 xgboost/HFSS。
 
 ## 待完成
 
