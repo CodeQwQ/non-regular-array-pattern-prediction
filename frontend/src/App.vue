@@ -148,8 +148,8 @@ onUnmounted(() => pollTimer && clearInterval(pollTimer))
             {{ project.project_name }} · {{ project.model_status }}
           </option>
         </select>
-        <label>HFSS 工程绝对路径</label>
-        <input v-model="hfssPath" placeholder="例如：E:\\projects\\array.aedt" />
+        <label for="hfss-path">HFSS 工程绝对路径</label>
+        <input id="hfss-path" v-model="hfssPath" placeholder="例如：E:\\projects\\array.aedt" />
         <button class="secondary" :disabled="busy" @click="bindProject">绑定工程</button>
         <p v-if="activeProject" class="meta">{{ activeProject.hfss_project_name }} · 模型：{{ activeProject.model_status }}</p>
         <button class="primary" :disabled="busy || !activeProject" @click="startTraining">开始训练</button>
@@ -157,8 +157,8 @@ onUnmounted(() => pollTimer && clearInterval(pollTimer))
 
       <article class="card">
         <h2>阵列输入与评价</h2>
-        <label>固定 JSON 输入（JSON 是权威来源）</label>
-        <textarea v-model="inputText" rows="11" placeholder='{"unit_count":1,"units":[{"unit_id":1,"i":1,"j":1,"x":0,"y":0}]}' />
+        <label for="array-input">固定 JSON 输入（JSON 是权威来源）</label>
+        <textarea id="array-input" v-model="inputText" rows="11" placeholder='{"unit_count":1,"units":[{"unit_id":1,"i":1,"j":1,"x":0,"y":0}]}' />
         <div class="modes">
           <button :class="{ selected: modes.includes('prediction') }" @click="toggleMode('prediction')">预测</button>
           <button :class="{ selected: modes.includes('validation') }" @click="toggleMode('validation')">验证</button>

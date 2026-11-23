@@ -37,6 +37,10 @@ Desktop.ini
 # Frontend dependency and build outputs
 frontend/node_modules/
 frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+*.sqlite3
+e2e-demo.aedt
 
 # HFSS/AEDT generated files and local caches
 *.lock
