@@ -23,7 +23,7 @@
 - JSON/网页输入规则的服务端校验、重复位置和字段校验。
 - 开发 HFSSAdapter 和确定性算法替身，明确不代表真实 HFSS/最终算法通过。
 - 结果目录、JSON 结果、元数据和 ZIP 下载。
-- 9 个第一阶段单元/集成/契约测试，当前 `9 passed`。
+- 10 个第一阶段单元/集成/契约测试，当前 `10 passed`。
 
 ## 待继续
 
@@ -47,5 +47,5 @@
 ```text
 RUN-20261123-TASK-BE-001-local
 命令：py -3.12 -m pytest -m "not hfss_server" -q
-结果：9 passed in 0.37s
+结果：10 passed in 0.95s
 ```
