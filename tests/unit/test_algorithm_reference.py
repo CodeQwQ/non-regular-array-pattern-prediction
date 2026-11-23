@@ -10,7 +10,17 @@ import cmath
 
 import pytest
 
-from backend.algorithm_reference import PATTERN_POINT_COUNT, build_zn, calculate_unit_features, generate_grid_array, get_grid_direction
+from backend.algorithm_reference import (
+    PATTERN_POINT_COUNT,
+    build_virtual_grid,
+    build_zn,
+    calculate_unit_features,
+    expand_cn_samples,
+    generate_grid_array,
+    get_grid_direction,
+    polarized_ecp,
+    solve_cn,
+)
 
 
 @pytest.mark.unit
@@ -50,3 +60,39 @@ def test_pattern_point_count_is_16471():
     """验证方向图 91×181 网格点数。"""
 
     assert PATTERN_POINT_COUNT == 16471
+
+
+@pytest.mark.unit
+def test_polarization_and_virtual_grid_order():
+    """验证 45° 极化恒等夹具和 meshgrid flatten 顺序。"""
+
+    assert polarized_ecp(0, 0, 0, 0, 45) == pytest.approx(1 + 0j)
+    grid = build_virtual_grid()
+    assert grid["m_flat"][:6] == [1, 2, 3, 4, 5, 1]
+    assert grid["n_flat"][:6] == [1, 1, 1, 1, 1, 2]
+    assert (grid["m_flat"][-1], grid["n_flat"][-1]) == (5, 5)
+
+
+@pytest.mark.unit
+def test_canonical_normal_equation_round_trip():
+    """验证正规方程路径可以恢复小型确定性 cn。"""
+
+    z = [[1 + 0j, 0.2 + 0.1j], [0.3 - 0.2j, 1.2 + 0j], [0.8 + 0.1j, -0.4 + 0.3j]]
+    expected = [0.7 - 0.2j, -0.1 + 0.4j]
+    target = [sum(row[i] * expected[i] for i in range(2)) for row in z]
+    actual = solve_cn(z, target)
+    assert actual[0].real == pytest.approx(expected[0].real, abs=1e-10)
+    assert actual[0].imag == pytest.approx(expected[0].imag, abs=1e-10)
+    assert actual[1].real == pytest.approx(expected[1].real, abs=1e-10)
+    assert actual[1].imag == pytest.approx(expected[1].imag, abs=1e-10)
+
+
+@pytest.mark.unit
+def test_cn_dataset_expansion_shape_and_column_order():
+    """验证 8 特征 + element_id + cn 实虚部的展开顺序。"""
+
+    columns, rows = expand_cn_samples([[1] * 8, [2] * 8], [[complex(i, -i) for i in range(25)], [complex(i + 1, -i - 1) for i in range(25)]])
+    assert columns == ["right", "right_up", "up", "left_up", "left", "left_down", "down", "right_down", "element_id", "cn_real", "cn_imag"]
+    assert len(rows) == 50
+    assert rows[0][8:] == [1.0, 0.0, 0.0]
+    assert rows[24][8] == 25.0
