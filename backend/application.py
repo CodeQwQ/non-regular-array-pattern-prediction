@@ -20,6 +20,7 @@ from .config import Settings
 from .cleanup import start_cleanup_process
 from .errors import AppError
 from .hfss_adapter import StubHFSSAdapter, UnavailableHFSSAdapter
+from .hfss_real_adapter import RealHFSSAdapter
 from .storage import SQLiteStore
 from .task_manager import TaskManager
 from .validation import normalise_array_input
@@ -35,7 +36,12 @@ class Application:
         self.settings.ensure_directories()
         self.store = store or SQLiteStore(self.settings.db_path)
         self.cleanup_process = start_cleanup_process(self.settings.data_root, self.settings.retention_days) if self.settings.cleanup_enabled else None
-        adapter = StubHFSSAdapter() if self.settings.hfss_mode == "stub" else UnavailableHFSSAdapter()
+        if self.settings.hfss_mode == "stub":
+            adapter = StubHFSSAdapter()
+        elif self.settings.hfss_mode == "real":
+            adapter = RealHFSSAdapter(self.settings.hfss_module_path, self.settings.hfss_design_name)
+        else:
+            adapter = UnavailableHFSSAdapter()
         predictor = self._build_predictor()
         self.tasks = TaskManager(self.settings, self.store, adapter, predictor)
 
@@ -70,13 +76,9 @@ class Application:
         path = payload.get("hfss_project_path") if isinstance(payload, dict) else None
         if not isinstance(path, str) or not path:
             raise AppError("PROJECT_PATH_INVALID", "hfss_project_path 必填", 400)
-        # bind 会执行绝对路径、扩展名和可访问性检查；真实适配器替换时仍保持该契约。
-        project_id = "pending"
-        if self.settings.hfss_mode != "stub":
-            raise AppError("PROJECT_BIND_FAILED", "真实 HFSS 适配器尚未在当前开发环境启用", 500)
         project = self.store.create_project(path, payload.get("project_name"))
         try:
-            StubHFSSAdapter().bind(path, project.project_id)
+            self.tasks.hfss.bind(path, project.project_id)
         except AppError:
             self.store.update_project(project.project_id, binding_status="invalid", model_status="invalid")
             raise

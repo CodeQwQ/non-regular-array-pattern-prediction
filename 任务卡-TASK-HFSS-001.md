@@ -9,11 +9,12 @@
 | 关联基线 | NFR-001、NFR-004、NFR-006、AC-001～AC-006、AC-020、AC-025～AC-027 |
 | 服务器命令 | `pytest -m hfss_server -q` |
 | 必填环境 | `ARRAYLAB_HFSS_PROJECT_PATH`、Windows 11、HFSS 2021、win32com |
-| 当前状态 | 验收入口已建立；开发机无合格工程，状态为 pending_external |
+| 当前状态 | 验收入口和 RealHFSSAdapter 延迟加载边界已建立；开发机无合格工程，状态为 pending_external |
 
 ## 服务器验收要求
 
 - 记录 RUN-ID、commit、Windows/HFSS/COM/许可证版本、工程文件和数据 hash。
+- `ARRAYLAB_HFSS_MODE=real` 通过 RealHFSSAdapter 延迟加载实验 HFSS 类；训练/验证 runner 必须在服务器任务配置中注入。
 - 先执行环境测试，再执行绑定、训练、验证、双模式、并发上限和资源释放场景。
 - 失败必须保留日志、截图、任务状态、进程时间线和结果目录；不能以 stub 结果替代。
 - 通过结论由服务器验收人员和审批人共同回填 `变更追踪矩阵.md`。

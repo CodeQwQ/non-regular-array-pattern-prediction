@@ -28,6 +28,8 @@ class Settings:
     model_path: Path | None = None
     cleanup_enabled: bool = False
     retention_days: int = 90
+    hfss_module_path: Path | None = None
+    hfss_design_name: str = "number1"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -50,6 +52,8 @@ class Settings:
             model_path=Path(os.environ["ARRAYLAB_MODEL_PATH"]) if os.getenv("ARRAYLAB_MODEL_PATH") else None,
             cleanup_enabled=os.getenv("ARRAYLAB_CLEANUP_ENABLED", "0") == "1",
             retention_days=int(os.getenv("ARRAYLAB_RETENTION_DAYS", "90")),
+            hfss_module_path=Path(os.environ["ARRAYLAB_HFSS_MODULE_PATH"]) if os.getenv("ARRAYLAB_HFSS_MODULE_PATH") else None,
+            hfss_design_name=os.getenv("ARRAYLAB_HFSS_DESIGN_NAME", "number1"),
             max_hfss_workers=min(4, max(1, int(os.getenv("ARRAYLAB_HFSS_WORKERS", "4")))),
         )
 
