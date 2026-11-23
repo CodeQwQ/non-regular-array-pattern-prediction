@@ -20,6 +20,7 @@
 - 91×181、16471 点方向图网格常量。
 - 4 个算法单元测试，纳入本地 pytest。
 - ECP 极化、虚拟阵元 flatten 顺序、正规方程 cn round-trip 和 6750 行展开规则已加入测试。
+- 总阵幅值/复场分离、单元零位置恒等和网格错位 fail-loud 规则已加入测试。
 
 ## 待完成
 
@@ -32,5 +33,5 @@
 
 ```text
 命令：py -3.12 -m pytest -m "not hfss_server" -q
-结果：17 passed
+结果：22 passed
 ```

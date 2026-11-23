@@ -27,6 +27,8 @@ VIRTUAL_GRID_COLS = 5
 VIRTUAL_DX_M = 0.005
 VIRTUAL_DY_M = 0.005
 VIRTUAL_CENTER_COMP = -2.0
+DEFAULT_FREQUENCY_HZ = 27.5e9
+SPEED_OF_LIGHT_M_S = 3e8
 
 
 def calc_distance(p1: Sequence[float], p2: Sequence[float]) -> float:
@@ -218,3 +220,45 @@ def expand_cn_samples(features: Sequence[Sequence[float]], cn_samples: Sequence[
         for element_id, value in enumerate(cn_row, start=1):
             rows.append([float(x) for x in feature_row] + [float(element_id), float(complex(value).real), float(complex(value).imag)])
     return columns, rows
+
+
+def synthesize_total_field(element_patterns: Sequence[Sequence[dict[str, float]]], positions_m: Sequence[Sequence[float]], frequency_hz: float = DEFAULT_FREQUENCY_HZ, steer_theta_deg: float = 20.0, steer_phi_deg: float = 0.0) -> dict[str, Any]:
+    """按实验计划 011 的幅值/复场分离口径合成总阵方向图。
+
+    参数：element_patterns 为每个单元的标准方向图记录；positions_m 为米制位置；frequency_hz 为频率；steer_theta/phi 为导向角。
+    返回：包含标准总阵 records、线性幅值数组和复场数组的字典；网格错位或数量不一致时抛出 ValueError。
+    """
+
+    if not element_patterns or len(element_patterns) != len(positions_m):
+        raise ValueError("单元方向图数量必须与位置数量一致且不为空")
+    first_keys = [(row["Theta[deg]"], row["Phi[deg]"]) for row in element_patterns[0]]
+    if len(set(first_keys)) != len(first_keys):
+        raise ValueError("单元方向图存在重复 Theta/Phi 键")
+    maps = []
+    for pattern in element_patterns:
+        current = {(row["Theta[deg]"], row["Phi[deg]"]): row for row in pattern}
+        if list(current) != first_keys:
+            raise ValueError("单元方向图 Theta/Phi 网格不一致")
+        maps.append(current)
+    beta = 2.0 * math.pi * frequency_hz / SPEED_OF_LIGHT_M_S
+    steer_u, steer_v = direction_cosines(steer_theta_deg, steer_phi_deg)
+    records: list[dict[str, float]] = []
+    amplitude_linear: list[float] = []
+    complex_field: list[complex] = []
+    for theta, phi in first_keys:
+        u, v = direction_cosines(theta, phi)
+        amplitude_sum = 0.0
+        total = 0j
+        for pattern, position in zip(maps, positions_m):
+            if len(position) != 2:
+                raise ValueError("位置必须是 x/y 二元米制坐标")
+            x_m, y_m = float(position[0]), float(position[1])
+            value = restore_complex(pattern[(theta, phi)]["ECP_dB"], pattern[(theta, phi)]["ECP_Phase_deg"])
+            amplitude_sum += abs(value)
+            phase = beta * (x_m * (u - steer_u) + y_m * (v - steer_v))
+            total += value * cmath.exp(1j * phase)
+        amplitude_linear.append(amplitude_sum)
+        complex_field.append(total)
+        amp_db = 20.0 * math.log10(max(amplitude_sum, 1e-10))
+        records.append({"Phi[deg]": float(phi), "Theta[deg]": float(theta), "ECP_dB": amp_db, "ECP_Phase_deg": math.degrees(cmath.phase(total))})
+    return {"records": records, "amplitude_linear": amplitude_linear, "complex_field": complex_field}

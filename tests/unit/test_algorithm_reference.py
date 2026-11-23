@@ -20,6 +20,7 @@ from backend.algorithm_reference import (
     get_grid_direction,
     polarized_ecp,
     solve_cn,
+    synthesize_total_field,
 )
 
 
@@ -96,3 +97,26 @@ def test_cn_dataset_expansion_shape_and_column_order():
     assert len(rows) == 50
     assert rows[0][8:] == [1.0, 0.0, 0.0]
     assert rows[24][8] == 25.0
+
+
+@pytest.mark.unit
+def test_total_field_identity_and_amplitude_phase_views():
+    """验证单元零位置恒等和两单元幅值/复场视图分离。"""
+
+    pattern = [{"Phi[deg]": 0.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0}]
+    one = synthesize_total_field([pattern], [(0.0, 0.0)], steer_theta_deg=0, steer_phi_deg=0)
+    two = synthesize_total_field([pattern, pattern], [(0.0, 0.0), (0.0, 0.0)], steer_theta_deg=0, steer_phi_deg=0)
+    assert one["amplitude_linear"] == pytest.approx([1.0])
+    assert one["complex_field"] == pytest.approx([1.0 + 0j])
+    assert two["amplitude_linear"] == pytest.approx([2.0])
+    assert two["complex_field"] == pytest.approx([2.0 + 0j])
+
+
+@pytest.mark.unit
+def test_total_field_rejects_grid_mismatch():
+    """验证单元方向图网格错位会 fail-loud。"""
+
+    first = [{"Phi[deg]": 0.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0}]
+    second = [{"Phi[deg]": 2.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0}]
+    with pytest.raises(ValueError, match="网格"):
+        synthesize_total_field([first, second], [(0.0, 0.0), (0.0, 0.0)])
