@@ -1,0 +1,43 @@
+# 文件基本信息：.gitignore
+# 用途：Git 忽略规则，排除缓存、运行数据和生成产物。
+# 维护：修改后同步目录索引和相关契约/测试。
+
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Runtime data, generated reports and test evidence
+data/
+artifacts/
+test_ecp_comparison/
+ecp_output_2/
+ecp_output_3/
+test_data/
+train_data/
+test_cn/
+test_ecp_real/
+*.log
+*.tmp
+*.bak
+
+# Local IDE and OS files
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+
+# HFSS/AEDT generated files and local caches
+*.lock
+*.aedt.lock
+*.aedtresults/
+*.aedb/
+*.hfssresults/
+

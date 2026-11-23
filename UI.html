@@ -1,0 +1,717 @@
+<!-- 文件基本信息：UI.html
+用途：前端 UI 原型，提供页面结构、状态和交互参考；正式实现不得保留演示逻辑。
+维护：修改后同步目录索引、UI 验收场景和测试。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ArrayLab · 非规则阵列训练工作台</title>
+<style>
+:root{
+  --bg:#f5f7fb;--bg-2:#f8f9fc;--panel:#ffffff;--panel-2:#f3f5fb;--panel-3:#e9edff;
+  --border:#e1e6f0;--border-soft:#e9edf5;--text:#20243a;--muted:#66708a;--subtle:#8992a8;
+  --accent:#626fe8;--accent-hover:#7885f4;--teal:#159e96;--green:#159b6b;--amber:#b7791f;--red:#dc5670;
+  --radius:14px;--shadow:0 8px 24px rgba(31,45,80,.07);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.app{min-height:100vh;display:grid;grid-template-columns:258px minmax(0,1fr)}
+.sidebar{border-right:1px solid var(--border-soft);background:#0c0e17;padding:20px 14px;display:flex;flex-direction:column;gap:22px;min-height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.brand-mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(140deg,#7886ff,#5b6ef5 55%,#4ecdc4);display:grid;place-items:center;box-shadow:0 0 22px rgba(91,110,245,.24)}
+.brand-mark svg{width:21px;height:21px}
+.brand-name{font-weight:750;font-size:16px;letter-spacing:-.03em}
+.brand-sub{font-size:10px;color:var(--muted);letter-spacing:.11em;text-transform:uppercase;margin-top:1px}
+.sidebar-label{padding:0 10px;color:var(--subtle);font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
+.new-project{display:flex;align-items:center;gap:9px;width:100%;padding:10px 12px;border:1px solid #343c69;border-radius:10px;background:linear-gradient(120deg,rgba(105,120,255,.18),rgba(78,205,196,.06));color:#eef0ff;text-align:left;transition:.18s}
+.new-project:hover{border-color:#6978ff;background:rgba(105,120,255,.2);transform:translateY(-1px)}
+.new-project .plus{width:22px;height:22px;display:grid;place-items:center;border-radius:6px;background:#6978ff;color:#fff;font-size:18px;line-height:1}
+.project-tools{display:flex;gap:8px;padding:0 2px}
+.searchbox{position:relative;flex:1}
+.searchbox svg{position:absolute;left:10px;top:10px;width:14px;color:var(--subtle)}
+.searchbox input{width:100%;background:#111420;border:1px solid var(--border-soft);border-radius:8px;padding:8px 8px 8px 30px;color:var(--text);outline:none;font-size:12px}
+.searchbox input:focus{border-color:#5665d6}
+.project-list{display:flex;flex-direction:column;gap:5px}
+.project-item{width:100%;border:1px solid transparent;background:transparent;color:var(--muted);padding:10px 10px;border-radius:10px;text-align:left;display:flex;gap:10px;align-items:flex-start;transition:.15s}
+.project-item:hover{background:#141725;color:var(--text)}
+.project-item.active{background:linear-gradient(110deg,rgba(105,120,255,.15),rgba(105,120,255,.05));border-color:#2b335c;color:var(--text)}
+.project-glyph{flex:0 0 29px;width:29px;height:29px;border:1px solid #303754;background:#171b2b;border-radius:8px;display:grid;place-items:center;color:#8e9aff}
+.project-item.active .project-glyph{background:#252b52;border-color:#454f91;color:#aeb6ff}
+.project-copy{min-width:0;flex:1}
+.project-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.project-meta{font-size:10px;color:var(--subtle);margin-top:3px;display:flex;align-items:center;gap:6px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--subtle);display:inline-block}
+.dot.green{background:var(--green);box-shadow:0 0 7px rgba(52,211,153,.4)}
+.sidebar-bottom{margin-top:auto;border-top:1px solid var(--border-soft);padding:15px 8px 0;display:flex;gap:10px;align-items:center}
+.avatar{width:31px;height:31px;border-radius:50%;background:linear-gradient(135deg,#424d86,#22283e);display:grid;place-items:center;font-size:11px;font-weight:700;color:#dbe0ff}
+.user-copy{flex:1}.user-name{font-size:12px;font-weight:600}.user-role{font-size:10px;color:var(--subtle)}
+.main{min-width:0;padding:26px clamp(18px,3vw,42px) 42px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:27px}
+.breadcrumb{display:flex;align-items:center;gap:9px;color:var(--subtle);font-size:12px}
+.breadcrumb strong{color:var(--muted);font-weight:500}
+.top-actions{display:flex;align-items:center;gap:10px}
+.ghost-btn,.outline-btn,.primary-btn,.danger-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:9px;padding:9px 12px;border:1px solid var(--border);color:var(--muted);background:#111420;font-size:12px;transition:.18s;white-space:nowrap}
+.ghost-btn:hover,.outline-btn:hover{border-color:#454d78;color:var(--text);background:#171b2b}
+.primary-btn{border-color:#6978ff;color:white;background:linear-gradient(135deg,#6978ff,#5665e8);box-shadow:0 4px 16px rgba(91,110,245,.18);font-weight:600}
+.primary-btn:hover{background:linear-gradient(135deg,#8290ff,#6574f4);transform:translateY(-1px)}
+.primary-btn:disabled{opacity:.38;cursor:not-allowed;transform:none;box-shadow:none}
+.danger-btn{border-color:#5b2b40;color:#ff9cb0;background:#21131c}
+.icon{width:15px;height:15px;display:inline-block;vertical-align:middle;flex-shrink:0}
+.heading-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}
+.eyebrow{color:#8d98ff;font-size:10px;text-transform:uppercase;letter-spacing:.15em;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.eyebrow:before{content:"";width:18px;height:1px;background:#6978ff}
+h1{font-size:27px;line-height:1.2;letter-spacing:-.045em;margin:0;font-weight:720}
+.subtitle{color:var(--muted);font-size:12px;margin:9px 0 0;max-width:650px}
+.heading-right{display:flex;align-items:center;gap:8px;padding-top:4px}
+.status-pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #333954;background:#141827;color:#aab1d4;border-radius:99px;padding:6px 10px;font-size:11px}
+.status-pill .dot{width:6px;height:6px}
+.status-pill.ready{border-color:#245b50;background:rgba(52,211,153,.08);color:#8ce7c7}
+.status-pill.ready .dot{background:var(--green)}
+.status-pill.running{border-color:#665328;color:#f9d47a;background:rgba(251,191,36,.07)}
+.panel{background:linear-gradient(150deg,rgba(19,23,38,.98),rgba(15,18,30,.98));border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
+.panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-bottom:1px solid var(--border-soft)}
+.panel-title{font-size:13px;font-weight:650;display:flex;align-items:center;gap:9px}
+.panel-title svg{color:#8994ff}
+.panel-subtitle{font-size:10px;color:var(--subtle);margin-top:3px}
+.section-number{font-size:10px;color:#818cff;background:rgba(105,120,255,.12);border:1px solid rgba(105,120,255,.19);border-radius:6px;padding:3px 6px}
+.top-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(320px,.88fr);gap:16px;margin-bottom:17px}
+.panel-body{padding:18px 19px}
+.file-state{display:flex;align-items:flex-start;gap:13px}
+.file-icon{width:42px;height:42px;border:1px solid #343b59;background:#171b2b;border-radius:11px;display:grid;place-items:center;color:#a5adff;flex-shrink:0}
+.file-main{min-width:0;flex:1}
+.file-title{font-size:12px;font-weight:650}
+.file-desc{font-size:11px;color:var(--muted);margin-top:4px}
+.path-box{margin-top:13px;padding:10px 11px;background:#0c0f18;border:1px solid #20263b;border-radius:8px;display:flex;align-items:center;gap:8px;min-width:0}
+.path-box svg{width:14px;height:14px;color:var(--subtle);flex-shrink:0}
+.path-text{font-size:10px;color:#747c9c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.file-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px}
+.microcopy{font-size:10px;color:var(--subtle)}
+.checking{display:inline-flex;align-items:center;gap:7px;color:#f8d27b;font-size:11px}
+.spinner{width:13px;height:13px;border:2px solid #61522e;border-top-color:#fbbf24;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.file-success{display:flex;align-items:center;gap:7px;color:#75dfb7;font-size:11px}
+.file-success svg{width:14px;height:14px}
+.config-body{display:grid;grid-template-columns:1fr 1fr;gap:14px 13px}
+.field{min-width:0;display:flex;flex-direction:column;gap:6px}
+.field label{font-size:10px;color:#a5accb;font-weight:550;display:flex;align-items:center;gap:6px}
+.field input,.field select{width:100%;min-width:0;background:#0d101a;border:1px solid #2a3049;border-radius:8px;padding:9px 10px;color:#e7eaff;outline:none;font-size:11px}
+.field input:focus,.field select:focus{border-color:#6978ff;box-shadow:0 0 0 2px rgba(105,120,255,.1)}
+.field input:disabled,.field select:disabled{opacity:.5}
+.field .hint{font-size:9px;color:var(--subtle);line-height:1.4}
+.field.full{grid-column:1/-1}
+.inline-unit{display:flex;gap:7px;align-items:center}
+.inline-unit input{flex:1}
+.unit{font-size:10px;color:var(--subtle)}
+.config-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border-soft);margin-top:17px;padding-top:14px}
+.reset-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#969dbb;padding:7px 2px;font-size:11px}
+.reset-btn:hover{color:#fff}
+.train-actions{display:flex;align-items:center;gap:12px}
+.train-note{font-size:10px;color:var(--subtle)}
+.results-panel{margin-top:17px}
+.results-toolbar{display:flex;align-items:center;gap:8px}
+.legend{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:10px}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-line{height:2px;width:16px;border-radius:3px;background:#7582ff}
+.legend-line.teal{background:var(--teal);border-top:1px dashed var(--teal)}
+.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:16px}
+.chart-card{background:#0d101a;border:1px solid #222841;border-radius:11px;padding:13px;min-width:0;overflow:hidden}
+.chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.chart-name{font-size:11px;font-weight:650;color:#e5e8ff}
+.chart-type{font-size:9px;color:var(--subtle);margin-top:3px}
+.chart-tag{font-size:9px;padding:3px 6px;border-radius:5px;background:#191e32;color:#969fc8;white-space:nowrap}
+.chart-visual{height:110px;display:grid;place-items:center;position:relative;border-radius:7px;background:linear-gradient(180deg,rgba(105,120,255,.025),transparent);overflow:hidden}
+.chart-visual svg{width:100%;height:100%;display:block}
+.chart-empty{display:flex;flex-direction:column;align-items:center;gap:8px;color:#68708f;font-size:10px}
+.chart-empty svg{width:27px;height:27px;color:#626b9c}
+.chart-caption{font-size:9px;color:var(--subtle);margin-top:7px;display:flex;justify-content:space-between;gap:8px}
+.metrics-section{margin-top:17px}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;padding:16px}
+.metric-card{padding:14px;border:1px solid #222841;background:#0d101a;border-radius:10px;min-width:0}
+.metric-label{font-size:10px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:5px}
+.metric-value{font-size:24px;font-weight:700;letter-spacing:-.04em;margin-top:11px;color:#edf0ff}
+.metric-unit{font-size:10px;color:var(--subtle);font-weight:500;letter-spacing:0}
+.metric-foot{font-size:9px;color:var(--subtle);margin-top:5px}
+.metric-mini{width:20px;height:20px;border-radius:6px;background:#1b2040;color:#9ba5ff;display:grid;place-items:center}
+.metric-mini svg{width:12px;height:12px}
+.bottom-note{font-size:10px;color:var(--subtle);margin-top:12px;display:flex;align-items:center;gap:7px}
+.bottom-note svg{width:13px;height:13px}
+.toast{position:fixed;right:24px;bottom:24px;background:#171d2c;border:1px solid #303958;color:#edf0ff;border-radius:10px;padding:12px 15px;box-shadow:var(--shadow);display:flex;align-items:center;gap:9px;font-size:12px;opacity:0;transform:translateY(8px);pointer-events:none;transition:.22s;z-index:20;max-width:min(420px,calc(100vw - 32px))}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast svg{color:var(--green);width:16px;height:16px;flex-shrink:0}
+.modal-backdrop{position:fixed;inset:0;background:rgba(3,5,12,.72);backdrop-filter:blur(7px);display:none;align-items:center;justify-content:center;padding:20px;z-index:30}
+.modal-backdrop.open{display:flex}
+.modal{width:min(460px,100%);background:#121624;border:1px solid #2c3350;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden;animation:modalIn .18s ease-out}
+@keyframes modalIn{from{opacity:0;transform:translateY(7px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+.modal-header{padding:20px 22px 16px;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.modal-title{font-size:17px;font-weight:700;letter-spacing:-.03em}
+.modal-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.close-btn{border:0;background:transparent;color:var(--subtle);font-size:22px;line-height:1;padding:0 2px}
+.modal-body{padding:20px 22px}
+.modal-body .field{margin-bottom:15px}
+.modal-body textarea{width:100%;min-height:82px;resize:vertical;background:#0d101a;border:1px solid #2a3049;border-radius:8px;padding:10px;color:#e7eaff;outline:none;font:inherit;font-size:12px}
+.modal-body textarea:focus{border-color:#6978ff}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border-soft);display:flex;justify-content:flex-end;gap:9px}
+.empty-search{font-size:11px;color:var(--subtle);padding:15px 10px;display:none}
+@media(max-width:1150px){.app{grid-template-columns:220px minmax(0,1fr)}.top-grid{grid-template-columns:1fr}.charts-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{min-height:auto;border-right:0;border-bottom:1px solid var(--border-soft);padding:13px 14px;gap:13px}.sidebar-label,.project-tools,.sidebar-bottom{display:none}.brand{padding:0 4px}.new-project{width:auto;align-self:flex-start;padding:8px 10px}.sidebar-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.project-list{flex-direction:row;overflow:auto}.project-item{min-width:180px}.main{padding:20px 14px 32px}.topbar{margin-bottom:20px}.heading-row{flex-direction:column}.heading-right{padding-top:0}.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}.chart-visual{height:95px}.panel-header{padding:14px}.panel-body{padding:14px}.config-body{gap:12px 9px}.config-actions{align-items:flex-start;flex-direction:column}.train-actions{width:100%;justify-content:space-between}.top-actions .ghost-btn{display:none}}
+@media(max-width:420px){.charts-grid{grid-template-columns:1fr}.metrics-grid{grid-template-columns:1fr 1fr}.field input,.field select{padding:8px}.chart-visual{height:125px}}
+
+/* Light theme overrides — visual palette only */
+:root{color-scheme:light}
+body{background:var(--bg);color:var(--text)}
+.sidebar{background:#fff;border-right-color:#e6eaf2}
+.brand-name{color:#20243a}.brand-sub,.sidebar-label{color:#929bb0}
+.new-project{border-color:#dfe4ff;background:linear-gradient(120deg,rgba(98,111,232,.10),rgba(21,158,150,.045));color:#30395f}
+.new-project:hover{border-color:#9ba6f5;background:rgba(98,111,232,.11)}
+.searchbox input{background:#f8f9fc;border-color:#e7eaf2;color:#30364d}
+.searchbox input::placeholder{color:#a0a8ba}
+.project-item{color:#68728c}.project-item:hover{background:#f5f6fb;color:#28304a}
+.project-item.active{background:linear-gradient(110deg,rgba(98,111,232,.10),rgba(98,111,232,.035));border-color:#dfe3fb;color:#293153}
+.project-glyph{border-color:#e3e7f2;background:#f5f6fb;color:#6876e9}
+.project-item.active .project-glyph{background:#eceeff;border-color:#d9defe;color:#626fe8}
+.project-meta{color:#929bb0}.sidebar-bottom{border-top-color:#e9edf5}
+.avatar{background:linear-gradient(135deg,#8793dc,#d9def8);color:#fff}
+.user-name{color:#30364d}.user-role{color:#929bb0}
+.ghost-btn,.outline-btn,.danger-btn{background:#fff;border-color:#e1e6f0;color:#68728c}
+.ghost-btn:hover,.outline-btn:hover{border-color:#cbd2e5;color:#30364d;background:#f8f9fc}
+.primary-btn{border-color:#626fe8;background:linear-gradient(135deg,#7180f0,#5c6add);color:#fff;box-shadow:0 4px 13px rgba(98,111,232,.16)}
+.primary-btn:hover{background:linear-gradient(135deg,#8190f6,#6877e9)}
+.danger-btn{border-color:#f1d5dc;color:#c64c68;background:#fff7f8}
+.breadcrumb{color:#929bb0}.breadcrumb strong{color:#626d87}
+h1{color:#20243a}.subtitle{color:#707b95}.eyebrow{color:#626fe8}.eyebrow:before{background:#7582ee}
+.status-pill{border-color:#e2e6ef;background:#f8f9fc;color:#68728c}
+.status-pill.ready{border-color:#cceadd;background:#effaf5;color:#16845e}
+.status-pill.running{border-color:#f0dfb8;color:#986b19;background:#fff9eb}
+.panel{background:#fff;border-color:#e5e9f2;box-shadow:0 8px 24px rgba(31,45,80,.055)}
+.panel-header{border-bottom-color:#edf0f6}.panel-title{color:#30364d}.panel-title svg{color:#6876e9}
+.panel-subtitle{color:#929bb0}.section-number{color:#626fe8;background:#f0f2ff;border-color:#e2e6ff}
+.file-icon{border-color:#e2e6f2;background:#f4f6ff;color:#6876e9}
+.file-title{color:#30364d}.file-desc{color:#78829a}
+.path-box{background:#f8f9fc;border-color:#e8ebf3}.path-text{color:#7f899f}
+.microcopy{color:#929bb0}.file-success{color:#16845e}
+.checking{color:#986b19}.spinner{border-color:#f0dfb8;border-top-color:#c18a2b}
+.field label{color:#68728c}
+.field input,.field select,.modal-body textarea{background:#fbfcfe;border-color:#e2e7f0;color:#30364d}
+.field input::placeholder,.modal-body textarea::placeholder{color:#a0a8ba}
+.field input:focus,.field select:focus,.modal-body textarea:focus{border-color:#8792ee;box-shadow:0 0 0 2px rgba(98,111,232,.10)}
+.field input:disabled,.field select:disabled{background:#f1f3f8;color:#929bb0}
+.field .hint{color:#929bb0}.config-actions{border-top-color:#edf0f6}
+.reset-btn{color:#78829a}.reset-btn:hover{color:#424b68}.train-note{color:#929bb0}
+.legend{color:#78829a}.legend-line{background:#6876e9}.legend-line.teal{background:#159e96}
+.chart-card{background:#fbfcfe;border-color:#e7ebf3}
+.chart-name{color:#39415b}.chart-type{color:#929bb0}
+.chart-tag{background:#f0f2fa;color:#74809b}
+.chart-visual{background:linear-gradient(180deg,rgba(98,111,232,.035),transparent)}
+.chart-empty{color:#929bb0}.chart-empty svg{color:#9aa3c5}.chart-caption{color:#929bb0}
+.metric-card{border-color:#e7ebf3;background:#fbfcfe}
+.metric-label{color:#74809b}.metric-value{color:#28304a}
+.metric-unit,.metric-foot{color:#929bb0}.metric-mini{background:#eef0ff;color:#6876e9}
+.bottom-note{color:#929bb0}
+.toast{background:#fff;border-color:#dfe5ef;color:#30364d;box-shadow:0 12px 32px rgba(31,45,80,.14)}
+.toast svg{color:#159b6b}
+.modal-backdrop{background:rgba(36,43,67,.30)}
+.modal{background:#fff;border-color:#e3e8f1;box-shadow:0 24px 70px rgba(31,45,80,.20)}
+.modal-header,.modal-footer{border-color:#edf0f6}
+.modal-title{color:#242a40}.modal-sub{color:#78829a}
+.close-btn{color:#929bb0}.close-btn:hover{color:#30364d}
+@media(max-width:760px){.sidebar{background:#fff;border-bottom-color:#e6eaf2}}
+
+
+/* Revised product interactions */
+.top-grid{grid-template-columns:minmax(260px,.72fr) minmax(500px,1.28fr)}
+.compact{padding:8px 10px;font-size:11px}
+.position-config{grid-column:1/-1;border-top:1px solid var(--border-soft);padding-top:14px}
+.position-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;background:#f8f9fc;border:1px solid #e7ebf3;border-radius:9px}
+.position-summary-copy{min-width:0}.position-summary-title{font-size:11px;font-weight:650;color:#39415b}
+.position-summary-meta{font-size:10px;color:#929bb0;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.position-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.file-input-label{display:inline-flex;align-items:center;gap:7px;border:1px solid #e1e6f0;border-radius:9px;padding:8px 10px;color:#68728c;background:#fff;font-size:11px;cursor:pointer}
+.file-input-label:hover{border-color:#cbd2e5;color:#30364d;background:#f8f9fc}.file-input-label input{display:none}
+.position-source-note{font-size:10px;color:#929bb0;margin-top:8px}.position-status{font-size:10px;color:#929bb0;margin-left:auto}
+.position-status.success{color:#16845e}.position-status.error{color:#c64c68}
+.mode-selector{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.toolbar-label{font-size:10px;color:#929bb0;margin-right:2px}
+.mode-btn{border:1px solid #e1e6f0;background:#fff;color:#68728c;border-radius:7px;padding:6px 9px;font-size:10px}
+.mode-btn:hover{border-color:#bfc8ed;color:#4d5bc7}.mode-btn.active{border-color:#9aa6f4;background:#eef0ff;color:#5967d9;font-weight:650}
+.results-toolbar{flex-wrap:wrap;justify-content:flex-end}.legend{margin-left:2px}.legend-line.validation{background:var(--teal);border-top:1px dashed var(--teal)}
+.chart-visual{height:220px;display:block;cursor:crosshair}.chart-visual canvas{width:100%;height:100%;display:block}
+.chart-tooltip{position:absolute;z-index:2;pointer-events:none;min-width:150px;padding:7px 9px;border:1px solid #dfe5ef;border-radius:7px;background:rgba(255,255,255,.96);box-shadow:0 8px 20px rgba(31,45,80,.14);font-size:10px;line-height:1.55;color:#30364d;display:none}
+.chart-tooltip strong{font-weight:650}.chart-caption{align-items:center}.chart-caption span:last-child{color:#6876e9}
+.position-modal{width:min(840px,100%)}.position-modal .modal-body{padding-top:14px}.position-modal-meta{font-size:11px;color:#68728c;margin-bottom:10px}
+.position-table-wrap{max-height:min(58vh,520px);overflow:auto;border:1px solid #e4e8f1;border-radius:9px}.position-table{width:100%;border-collapse:collapse;min-width:560px;font-size:11px}
+.position-table th{position:sticky;top:0;background:#f4f6fb;color:#68728c;font-weight:650;text-align:left;padding:9px 10px;border-bottom:1px solid #e2e7f0}
+.position-table td{padding:7px 10px;border-bottom:1px solid #edf0f6;color:#56617c}.position-table tr:last-child td{border-bottom:0}.position-table td:first-child{color:#929bb0}
+.position-table input{width:100%;background:#fbfcfe;border:1px solid #e2e7f0;border-radius:6px;padding:6px 7px;color:#30364d;font-size:11px;outline:none}
+.position-table input:focus{border-color:#8792ee;box-shadow:0 0 0 2px rgba(98,111,232,.10)}.position-modal-error{min-height:18px;color:#c64c68;font-size:10px;margin-top:9px}
+.result-data-note{font-size:10px;color:#929bb0;margin:0 16px 15px;display:flex;align-items:center;gap:6px}
+@media(max-width:1150px){.top-grid{grid-template-columns:1fr}.position-summary{align-items:flex-start;flex-direction:column}.position-status{margin-left:0}}
+@media(max-width:760px){.results-toolbar{justify-content:flex-start}.legend{width:100%;margin-top:4px}.position-actions{align-items:stretch;flex-direction:column}.position-actions button,.file-input-label{justify-content:center}.chart-visual{height:190px}}
+
+
+.task-panel{margin-top:17px}.task-status-body{padding:16px 19px}.task-status-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.task-meta{display:flex;align-items:center;gap:8px;color:#78829a;font-size:10px}.task-meta code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#626fe8;background:#f0f2ff;border-radius:5px;padding:3px 6px}.task-stage{color:#68728c}
+.task-status-tag,.branch-status{display:inline-flex;align-items:center;gap:6px;border:1px solid #e1e6f0;border-radius:99px;padding:5px 9px;color:#78829a;background:#f8f9fc;font-size:10px;white-space:nowrap}.task-status-tag.running,.branch-status.running{border-color:#f0dfb8;background:#fff9eb;color:#986b19}.task-status-tag.success,.branch-status.success{border-color:#cceadd;background:#effaf5;color:#16845e}.task-status-tag.failed,.branch-status.failed{border-color:#f1d5dc;background:#fff7f8;color:#c64c68}.task-status-tag.partial,.branch-status.partial{border-color:#e5d5fa;background:#faf5ff;color:#7a4ca8}
+.branch-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:13px}.branch-card{padding:11px 12px;border:1px solid #e7ebf3;border-radius:9px;background:#fbfcfe;min-width:0}.branch-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.branch-name{font-size:11px;font-weight:650;color:#39415b}.branch-message{font-size:10px;color:#929bb0;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.task-error{margin-top:12px;padding:9px 10px;border:1px solid #f1d5dc;border-radius:8px;background:#fff7f8;color:#c64c68;font-size:10px}.task-error[hidden]{display:none}
+.results-toolbar .result-action{font-size:10px}.data-modal{width:min(980px,100%)}.data-modal .modal-body{padding-top:14px}.data-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#68728c;font-size:10px;margin-bottom:10px}.data-table-wrap{max-height:min(60vh,560px);overflow:auto;border:1px solid #e4e8f1;border-radius:9px}.data-table{width:100%;border-collapse:collapse;min-width:680px;font-size:10px}.data-table th{position:sticky;top:0;background:#f4f6fb;color:#68728c;font-weight:650;text-align:left;padding:8px 9px;border-bottom:1px solid #e2e7f0}.data-table td{padding:7px 9px;border-bottom:1px solid #edf0f6;color:#56617c;font-variant-numeric:tabular-nums}.data-table tr:last-child td{border-bottom:0}.data-table-empty{padding:24px;text-align:center;color:#929bb0;font-size:11px}
+@media(max-width:760px){.branch-status-grid{grid-template-columns:1fr}.task-status-head{align-items:flex-start;flex-direction:column}.data-summary{align-items:flex-start;flex-direction:column}}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 17.5 8.2 6l3.8 12 3.8-12L20 17.5" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.1" fill="#4ecdc4"/></svg>
+        </div>
+        <div><div class="brand-name">ArrayLab</div><div class="brand-sub">Antenna intelligence</div></div>
+      </div>
+      <button class="new-project" id="newProjectBtn" style="margin-top:20px">
+        <span class="plus">+</span><span>新建项目</span>
+      </button>
+    </div>
+    <div>
+      <div class="sidebar-label" style="margin-bottom:9px">工作区 / Projects</div>
+      <div class="project-tools">
+        <div class="searchbox">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input id="projectSearch" placeholder="搜索项目…" aria-label="搜索项目"/>
+        </div>
+      </div>
+      <div class="project-list" id="projectList" style="margin-top:9px"></div>
+      <div class="empty-search" id="emptySearch">没有找到匹配的项目</div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="avatar">AL</div>
+      <div class="user-copy"><div class="user-name">Research Workspace</div><div class="user-role">本地演示环境</div></div>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" style="color:#656d8b"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="breadcrumb"><span>工作区</span><span>›</span><strong>训练工作台</strong></div>
+      <div class="top-actions">
+        <button class="ghost-btn" id="exportBtn" title="导出当前演示配置">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          导出配置
+        </button>
+        <button class="outline-btn" id="helpBtn">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M9.7 9a2.4 2.4 0 1 1 4.2 1.6c-1.1 1-1.9 1.3-1.9 2.7M12 16.7v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          使用说明
+        </button>
+      </div>
+    </div>
+
+    <div class="heading-row">
+      <div>
+        <div class="eyebrow">MODEL TRAINING WORKSPACE</div>
+        <h1 id="pageTitle">非规则阵列 ECP 预测</h1>
+        <p class="subtitle" id="pageDescription">通过代理模型学习阵列几何与方向图之间的映射关系，并对目标阵列的幅度与相位进行预测验证。</p>
+      </div>
+      <div class="heading-right">
+        <span class="status-pill" id="projectStatus"><span class="dot"></span><span>待配置</span></span>
+      </div>
+    </div>
+
+    <div class="top-grid">
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M13 3v7h7M8 14h8M8 17h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              HFSS 工程绑定
+            </div>
+            <div class="panel-subtitle">连接工程文件并模拟执行可用性检查</div>
+          </div>
+          <span class="section-number">01 / SOURCE</span>
+        </div>
+        <div class="panel-body">
+          <div class="file-state">
+            <div class="file-icon" id="fileIcon">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" style="width:21px;height:21px"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 3v7h7" stroke="currentColor" stroke-width="1.5"/></svg>
+            </div>
+            <div class="file-main">
+              <div class="file-title" id="fileTitle">尚未绑定 HFSS 工程</div>
+              <div class="file-desc" id="fileDesc">绑定后将读取训练集与验证集的索引信息。</div>
+              <div class="path-box">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M3 7.5h7l2 2H21v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h3" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                <span class="path-text" id="filePath">等待绑定后显示工程路径</span>
+              </div>
+            </div>
+          </div>
+          <div class="file-footer">
+            <span id="fileStatus" class="microcopy">演示模式 · 暂不访问真实本地文件</span>
+            <button class="outline-btn" id="bindBtn">
+              <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M8.5 12.5 15 6a4 4 0 0 1 5.7 5.7l-8.5 8.5a6 6 0 0 1-8.5-8.5l8-8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              绑定 HFSS 工程
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.5"/></svg>
+              训练配置
+            </div>
+            <div class="panel-subtitle">设置训练数据规模和预测阵列位置</div>
+          </div>
+          <span class="section-number">02 / CONFIG</span>
+        </div>
+        <div class="panel-body">
+          <div class="config-body">
+            <div class="field">
+              <label for="trainSize">训练数据阵列尺寸</label>
+              <input id="trainSize" type="text" value="3 × 3（固定）" aria-readonly="true" disabled />
+              <span class="hint">本版本固定使用 3 × 3 小规模阵列生成训练数据</span>
+            </div>
+            <div class="field">
+              <label for="predictSize">预测阵列尺寸</label>
+              <select id="predictSize">
+                <option value="1">1 × 1</option><option value="2">2 × 2</option><option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5" selected>5 × 5</option><option value="6">6 × 6</option><option value="7">7 × 7</option><option value="8">8 × 8</option><option value="9">9 × 9</option><option value="10">10 × 10</option>
+              </select>
+              <span class="hint" id="predictCountHint">需要填写 25 个子单元位置</span>
+            </div>
+            <div class="field full position-config">
+              <label>预测阵列子单元位置</label>
+              <div class="position-summary">
+                <div class="position-summary-copy">
+                  <div class="position-summary-title" id="positionSummaryTitle">尚未填写位置</div>
+                  <div class="position-summary-meta" id="positionSummaryMeta">根据预测阵列尺寸，需要填写 25 个单元的 x、y（mil）</div>
+                </div>
+                <button class="outline-btn compact" type="button" id="openPositionBtn">填写位置表单</button>
+              </div>
+              <div class="position-actions">
+                <label class="file-input-label" for="positionFileInput">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  导入 JSON 文件
+                  <input id="positionFileInput" type="file" accept=".json,application/json" />
+                </label>
+                <button class="reset-btn" type="button" id="clearPositionBtn">清除位置输入</button>
+                <span class="position-status" id="positionStatus">未输入</span>
+              </div>
+              <div class="position-source-note">手工表单与 JSON 同时存在时，以 JSON 文件为准；i、j 和 unit_id 由系统按顺序生成。</div>
+            </div>
+          </div>
+          <div class="config-actions">
+            <button class="reset-btn" id="resetBtn">
+              <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M3 11a9 9 0 1 1 2.7 6.4M3 4v7h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              重置参数
+            </button>
+            <div class="train-actions">
+              <span class="train-note" id="trainNote">请先绑定并检查工程</span>
+              <button class="primary-btn" id="trainBtn" disabled>
+                <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="m8 5 11 7-11 7z" fill="currentColor"/></svg>
+                开始训练
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel task-panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">
+            <svg class="icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            任务状态
+          </div>
+          <div class="panel-subtitle">显示训练、预测和验证任务的当前阶段、分支状态与错误信息</div>
+        </div>
+        <span class="section-number">03 / TASK</span>
+      </div>
+      <div class="task-status-body">
+        <div class="task-status-head">
+          <div class="task-meta"><span>任务 ID</span><code id="taskId">—</code><span class="task-stage" id="taskStage">等待任务</span></div>
+          <span class="task-status-tag" id="taskOverallTag"><span class="dot"></span>暂无任务</span>
+        </div>
+        <div class="branch-status-grid">
+          <div class="branch-card">
+            <div class="branch-card-head"><span class="branch-name">预测分支</span><span class="branch-status" id="predictionTaskStatus">未选择</span></div>
+            <div class="branch-message" id="predictionTaskMessage">等待评价任务</div>
+          </div>
+          <div class="branch-card">
+            <div class="branch-card-head"><span class="branch-name">验证分支</span><span class="branch-status" id="validationTaskStatus">未选择</span></div>
+            <div class="branch-message" id="validationTaskMessage">等待评价任务</div>
+          </div>
+        </div>
+        <div class="task-error" id="taskError" role="alert" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel results-panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">
+            <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h17M7 15l4-5 3 2 5-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="10" r="1.2" fill="currentColor"/><circle cx="14" cy="12" r="1.2" fill="currentColor"/></svg>
+            方向图预测与验证
+          </div>
+          <div class="panel-subtitle">浏览器直接绘制总阵方向图，悬停曲线查看 φ、θ 和具体数值</div>
+        </div>
+        <div class="results-toolbar">
+          <div class="mode-selector" aria-label="执行模式">
+            <span class="toolbar-label">执行模式</span>
+            <button class="mode-btn active" type="button" data-mode="prediction" aria-pressed="true">预测</button>
+            <button class="mode-btn" type="button" data-mode="validation" aria-pressed="false">验证</button>
+          </div>
+          <button class="primary-btn compact" type="button" id="evaluateBtn" disabled>执行所选任务</button>
+          <button class="outline-btn compact result-action" type="button" id="viewDataBtn" disabled>查看数据</button>
+          <button class="ghost-btn compact result-action" type="button" id="downloadBtn" disabled>下载结果</button>
+          <div class="legend" id="legend"></div>
+          <span class="section-number">03 / RESULTS</span>
+        </div>
+      </div>
+      <div class="charts-grid" id="chartsGrid"></div>
+      <div class="result-data-note" id="resultDataNote">训练完成并执行任务后，结果数据会在此处以交互图展示；完整数据仍由后端结果接口提供并支持下载。</div>
+    </section>
+
+    <section class="panel metrics-section">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">
+            <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="7" y="12" width="3" height="5" rx=".7" fill="currentColor"/><rect x="12" y="8" width="3" height="9" rx=".7" fill="currentColor"/><rect x="17" y="5" width="3" height="12" rx=".7" fill="currentColor"/></svg>
+            结果摘要
+          </div>
+          <div class="panel-subtitle">展示本次任务的模式、阵元数量、采样点和结果状态</div>
+        </div>
+        <span class="section-number">04 / METRICS</span>
+      </div>
+      <div class="metrics-grid" id="metricsGrid"></div>
+    </section>
+
+    <div class="bottom-note">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M12 11v5M12 7.5v.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      当前为可交互前端草图；绑定、训练和执行任务仍使用演示状态，正式版由后端接口返回真实 HFSS、模型和结果数据。
+    </div>
+  </main>
+</div>
+
+
+
+<div class="modal-backdrop" id="dataModal" role="dialog" aria-modal="true" aria-labelledby="dataModalTitle">
+  <div class="modal data-modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="dataModalTitle">查看总阵结果数据</div><div class="modal-sub">页面显示采样数据预览，完整结果通过下载接口获取。</div></div>
+      <button class="close-btn" id="closeDataModal" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="data-summary"><span id="dataSummary">—</span><span>当前预览前 100 个采样点</span></div>
+      <div class="data-table-wrap"><table class="data-table"><thead id="resultDataTableHead"></thead><tbody id="resultDataTableBody"></tbody></table></div>
+    </div>
+    <div class="modal-footer"><button class="outline-btn" type="button" id="cancelDataModal">关闭</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="positionModal" role="dialog" aria-modal="true" aria-labelledby="positionModalTitle">
+  <div class="modal position-modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="positionModalTitle">填写预测阵列位置</div><div class="modal-sub">i、j 和 unit_id 按阵列顺序自动生成，只需填写 x、y，单位为 mil。</div></div>
+      <button class="close-btn" id="closePositionModal" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="position-modal-meta" id="positionModalMeta"></div>
+      <div class="position-table-wrap">
+        <table class="position-table">
+          <thead><tr><th>unit_id</th><th>i</th><th>j</th><th>x（mil）</th><th>y（mil）</th></tr></thead>
+          <tbody id="positionTableBody"></tbody>
+        </table>
+      </div>
+      <div class="position-modal-error" id="positionModalError" role="alert"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="outline-btn" type="button" id="cancelPositionModal">取消</button>
+      <button class="primary-btn" type="button" id="savePositionModal">保存位置</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="projectModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="modalTitle">创建训练项目</div><div class="modal-sub">为新的非规则阵列实验建立独立工作区。</div></div>
+      <button class="close-btn" id="closeModal" aria-label="关闭">×</button>
+    </div>
+    <form id="projectForm">
+      <div class="modal-body">
+        <div class="field">
+          <label for="newName">项目名称 <span style="color:#fb7185">*</span></label>
+          <input id="newName" name="name" placeholder="例如：5×5 非规则阵列预测" maxlength="64" required/>
+        </div>
+        <div class="field">
+          <label for="newDescription">项目描述</label>
+          <textarea id="newDescription" name="description" placeholder="简单说明本次实验的目标、阵列规模或模型方案（选填）"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="outline-btn" type="button" id="cancelModal">取消</button>
+        <button class="primary-btn" type="submit">创建项目</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="toastText">操作成功</span></div>
+
+<script>
+const FIXED_HFSS_PATH = String.raw`D:\HFSS\antenna_design\irregular_array.aedt`;
+const defaults = {trainSize:"3",predictSize:"5",positions:[],jsonPositions:null,jsonFileName:"",positionSource:"manual"};
+function createTaskState(overrides={}){return {taskId:null,taskType:null,status:"idle",currentStage:"idle",predictionStatus:"not_selected",validationStatus:"not_selected",resultAvailable:false,message:"暂无任务",error:null,...overrides}}
+const projects = [
+  {id:1,name:"非规则阵列 ECP 预测",description:"通过代理模型学习阵列几何与方向图之间的映射关系，并对目标阵列的幅度与相位进行预测验证。",bound:false,checking:false,trained:false,training:false,evaluating:false,resultReady:false,evaluationModes:["prediction"],taskState:createTaskState(),config:{...defaults},created:"刚刚"},
+  {id:2,name:"阵列模型验证 · 实验 02",description:"对比不同代理模型在阵列方向图预测任务中的表现。",bound:true,checking:false,trained:true,training:false,evaluating:false,resultReady:true,evaluationModes:["prediction","validation"],taskState:createTaskState({taskId:"task_demo_002",taskType:"evaluation",status:"succeeded",currentStage:"result_persist",predictionStatus:"succeeded",validationStatus:"succeeded",resultAvailable:true,message:"演示结果已生成"}),config:{...defaults,positions:makePositions(5),positionSource:"manual"},created:"昨天"}
+];
+let activeId=1;
+let chartStates=[];
+const $ = id => document.getElementById(id);
+const svgIcon = (name, size=16) => {
+ const paths = {
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  chart:'<path d="M4 19V5M4 19h17M7 15l4-5 3 2 5-7"/><circle cx="11" cy="10" r="1" fill="currentColor"/>',
+  check:'<path d="m5 12 4 4L19 6"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  file:'<path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2V10z"/><path d="M13 3v7h7"/>'
+ };
+ return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.grid}</svg>`;
+};
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function makePositions(size, existing=[]){
+ const n=Math.max(1,Number(size)||1);
+ return Array.from({length:n*n},(_,index)=>{const old=existing[index]||{};return {unit_id:index+1,i:Math.floor(index/n)+1,j:index%n+1,x:old.x??"",y:old.y??""};});
+}
+function cloneConfig(config){const c={...defaults,...config};c.positions=Array.isArray(c.positions)?c.positions.map(x=>({...x})):[];c.jsonPositions=Array.isArray(c.jsonPositions)?c.jsonPositions.map(x=>({...x})):null;return c;}
+function activeProject(){return projects.find(p=>p.id===activeId)||projects[0]}
+function arraySize(){return Math.max(1,Number($("predictSize").value)||1)}
+function expectedUnitCount(){const n=arraySize();return n*n}
+function renderProjectList(){
+ const query=$("projectSearch").value.trim().toLowerCase();const list=$("projectList");list.innerHTML="";
+ const filtered=projects.filter(p=>p.name.toLowerCase().includes(query));$("emptySearch").style.display=filtered.length?"none":"block";
+ filtered.forEach(p=>{const el=document.createElement("button");el.className="project-item"+(p.id===activeId?" active":"");el.type="button";const state=p.training?'<span class="dot"></span>训练中':p.evaluating?'<span class="dot"></span>执行中':p.trained?'<span class="dot green"></span>已训练':p.bound?'<span class="dot green"></span>已绑定':'<span class="dot"></span>待配置';el.innerHTML=`<span class="project-glyph">${svgIcon("grid",15)}</span><span class="project-copy"><span class="project-name">${escapeHtml(p.name)}</span><span class="project-meta">${state}<span>·</span>${p.created}</span></span>`;el.addEventListener("click",()=>{activeId=p.id;renderAll()});list.appendChild(el)});
+}
+function renderHeader(){
+ const p=activeProject();$("pageTitle").textContent=p.name;$("pageDescription").textContent=p.description||"配置阵列预测实验，检查工程绑定状态并运行模型训练。";const status=$("projectStatus");
+ if(p.training){status.className="status-pill running";status.innerHTML='<span class="dot"></span><span>训练中</span>';}else if(p.evaluating){status.className="status-pill running";status.innerHTML='<span class="dot"></span><span>任务执行中</span>';}else if(p.trained){status.className="status-pill ready";status.innerHTML='<span class="dot"></span><span>训练完成</span>';}else if(p.bound){status.className="status-pill ready";status.innerHTML='<span class="dot"></span><span>工程已就绪</span>';}else if(p.checking){status.className="status-pill running";status.innerHTML='<span class="dot"></span><span>检查中</span>';}else{status.className="status-pill";status.innerHTML='<span class="dot"></span><span>待配置</span>';}
+}
+function saveConfigFromInputs(){const p=activeProject();p.config.trainSize=$("trainSize").value;p.config.predictSize=$("predictSize").value;p.config.positions=Array.isArray(p.config.positions)?p.config.positions:[];updatePositionSummary()}
+function loadConfig(config){const c=cloneConfig(config);$("trainSize").value=c.trainSize;$("predictSize").value=c.predictSize;updatePositionSummary()}
+function updatePositionSummary(){
+ const p=activeProject(),c=p.config,count=expectedUnitCount();const source=c.jsonPositions?.length?`JSON：${c.jsonFileName||"已导入"}`:c.positions?.length?"网页表单":"未输入";const complete=(c.jsonPositions?.length===count)||(c.positions?.length===count&&c.positions.every(u=>Number.isFinite(Number(u.x))&&Number.isFinite(Number(u.y))));
+ $("predictCountHint").textContent=`需要填写 ${count} 个子单元位置`;$("positionSummaryTitle").textContent=complete?`已填写 ${count} 个子单元位置`:source==="未输入"?"尚未填写位置":`已录入 ${c.jsonPositions?.length||c.positions?.length||0} / ${count} 个位置`;$("positionSummaryMeta").textContent=complete?`${source} · x、y 单位为 mil · i、j 已自动生成`:`根据预测阵列尺寸，需要填写 ${count} 个单元的 x、y（mil）`;
+ const status=$("positionStatus");status.className="position-status"+(complete?" success":"");status.textContent=complete?`${source} · 可提交`:source;const modes=p.evaluationModes||[];const predictionReady=!modes.includes("prediction")||p.trained;const validationReady=!modes.includes("validation")||p.bound;$("evaluateBtn").disabled=!complete||!modes.length||!predictionReady||!validationReady||p.training||p.evaluating;renderResultActions();
+}
+function renderFile(){
+ const p=activeProject(),btn=$("bindBtn");$("fileIcon").innerHTML=p.checking?'<span class="spinner" style="width:20px;height:20px;border-width:2px"></span>':p.bound?`<svg class="icon" viewBox="0 0 24 24" fill="none" style="width:22px;height:22px;color:#63e6b4"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`:'<svg class="icon" viewBox="0 0 24 24" fill="none" style="width:21px;height:21px"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2-2V10z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 3v7h7" stroke="currentColor" stroke-width="1.5"/></svg>';
+ $("fileTitle").textContent=p.checking?"正在检查 HFSS 工程…":p.bound?"HFSS 工程已绑定":"尚未绑定 HFSS 工程";$("fileDesc").textContent=p.checking?"正在验证工程路径与可用性，请稍候。":p.bound?"工程检查通过，训练数据与验证数据将由后端读取。":"绑定后将读取训练集与验证集的索引信息。";$("filePath").textContent=p.bound?FIXED_HFSS_PATH:"等待绑定后显示工程路径";
+ $("fileStatus").innerHTML=p.checking?'<span class="checking"><span class="spinner"></span>正在检查 · 预计 1 秒</span>':p.bound?'<span class="file-success">'+svgIcon("check",14)+'检查成功 · 演示状态</span>':'演示模式 · 暂不访问真实本地文件';btn.disabled=p.checking||p.training||p.evaluating;btn.innerHTML=p.checking?'<span class="spinner"></span>检查中…':p.bound?(p.training?'<span class="spinner"></span>训练中…':svgIcon("check",14)+' 重新绑定工程'):'<svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M8.5 12.5 15 6a4 4 0 0 1 5.7 5.7l-8.5 8.5a6 6 0 0 1-8.5-8.5l8-8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> 绑定 HFSS 工程';$("trainBtn").disabled=!p.bound||p.checking||p.training||p.evaluating;$("trainNote").textContent=p.checking?"等待工程检查完成":p.bound?(p.training?"训练任务执行中":p.evaluating?"评价任务执行中":p.trained?"模型已训练，可执行评价":"配置完成后即可启动训练"):"请先绑定并检查工程";
+}
+const chartDefs=[
+ {theta:0,type:"幅度",unit:"dB",color:"#6876e9"},{theta:45,type:"幅度",unit:"dB",color:"#6876e9"},{theta:90,type:"幅度",unit:"dB",color:"#6876e9"},
+ {theta:0,type:"相位",unit:"°",color:"#159e96"},{theta:45,type:"相位",unit:"°",color:"#159e96"},{theta:90,type:"相位",unit:"°",color:"#159e96"}
+];
+function buildChartData(def,index){
+ const modes=activeProject().evaluationModes||["prediction"];
+ return Array.from({length:181},(_,i)=>{const phi=i*2;const wave=Math.sin(i*.105+index*.61)*7+Math.cos(i*.035+index)*3;const pred=def.type==="幅度"?-10+wave+(index%3)*.9:-70+((phi*1.8+index*23)%360)-180+Math.sin(i*.12)*8;const validation=def.type==="幅度"?pred+Math.sin(i*.16+index)*1.25+.45:pred+Math.sin(i*.09+index)*7-2;return {phi,theta:def.theta,prediction:pred,validation,modes};});
+}
+function chartRange(def){return def.type==="幅度"?{min:-40,max:5}:{min:-180,max:180}}
+function drawChart(canvas,state,hoverIndex=-1){
+ const rect=canvas.getBoundingClientRect();const width=Math.max(260,Math.floor(rect.width));const height=Math.max(160,Math.floor(rect.height));const dpr=window.devicePixelRatio||1;canvas.width=width*dpr;canvas.height=height*dpr;const ctx=canvas.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);
+ const pad={left:38,right:12,top:14,bottom:27},plotW=width-pad.left-pad.right,plotH=height-pad.top-pad.bottom,range=chartRange(state.def);const x=i=>pad.left+i/(state.data.length-1)*plotW;const y=v=>pad.top+(range.max-v)/(range.max-range.min)*plotH;
+ ctx.clearRect(0,0,width,height);ctx.fillStyle="#fbfcfe";ctx.fillRect(0,0,width,height);ctx.strokeStyle="#e7ebf3";ctx.lineWidth=1;ctx.font="9px Inter, Microsoft YaHei, sans-serif";ctx.fillStyle="#929bb0";
+ for(let g=0;g<=4;g++){const yy=pad.top+g/4*plotH;ctx.beginPath();ctx.moveTo(pad.left,yy);ctx.lineTo(width-pad.right,yy);ctx.stroke();const value=range.max-(range.max-range.min)*g/4;ctx.fillText(`${Math.round(value)}${state.def.unit}`,3,yy+3)}
+ for(let g=0;g<=4;g++){const xx=pad.left+g/4*plotW;ctx.beginPath();ctx.moveTo(xx,pad.top);ctx.lineTo(xx,height-pad.bottom);ctx.stroke();ctx.fillText(`${g*90}°`,xx-10,height-9)}
+ const drawLine=(key,color,dash=[])=>{ctx.strokeStyle=color;ctx.lineWidth=key==="prediction"?2:1.7;ctx.setLineDash(dash);ctx.beginPath();state.data.forEach((point,i)=>{const xx=x(i),yy=y(point[key]);i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)});ctx.stroke();ctx.setLineDash([])};
+ if(state.modes.includes("prediction"))drawLine("prediction",state.def.color);if(state.modes.includes("validation"))drawLine("validation","#159e96",[5,3]);
+ if(hoverIndex>=0){const xx=x(hoverIndex);ctx.strokeStyle="#9aa5c9";ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(xx,pad.top);ctx.lineTo(xx,height-pad.bottom);ctx.stroke();ctx.setLineDash([]);for(const key of state.modes){ctx.fillStyle=key==="prediction"?state.def.color:"#159e96";ctx.beginPath();ctx.arc(xx,y(state.data[hoverIndex][key]),3,0,Math.PI*2);ctx.fill()}}
+}
+function attachChartInteraction(visual,canvas,state,tooltip){
+ visual.addEventListener("mousemove",e=>{const rect=canvas.getBoundingClientRect();const pos=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const index=Math.round(pos*(state.data.length-1));state.hoverIndex=index;drawChart(canvas,state,index);const point=state.data[index];const rows=[`<strong>φ ${point.phi}° · θ ${point.theta}°</strong>`];if(state.modes.includes("prediction"))rows.push(`预测：${point.prediction.toFixed(3)} ${state.def.unit}`);if(state.modes.includes("validation"))rows.push(`验证：${point.validation.toFixed(3)} ${state.def.unit}`);tooltip.innerHTML=rows.join("<br>");tooltip.style.display="block";const left=Math.min(Math.max(e.clientX-rect.left+12,8),rect.width-164),top=Math.max(8,e.clientY-rect.top-46);tooltip.style.left=`${left}px`;tooltip.style.top=`${top}px`});
+ visual.addEventListener("mouseleave",()=>{tooltip.style.display="none";state.hoverIndex=-1;drawChart(canvas,state)});
+}
+function renderLegend(modes){const legend=$("legend");legend.innerHTML="";if(modes.includes("prediction"))legend.insertAdjacentHTML("beforeend",'<span class="legend-item"><i class="legend-line"></i>预测值</span>');if(modes.includes("validation"))legend.insertAdjacentHTML("beforeend",'<span class="legend-item"><i class="legend-line validation"></i>验证真值</span>')}
+function renderModeButtons(){const modes=activeProject().evaluationModes||["prediction"];document.querySelectorAll(".mode-btn").forEach(btn=>{const active=modes.includes(btn.dataset.mode);btn.classList.toggle("active",active);btn.setAttribute("aria-pressed",String(active))});renderLegend(modes)}
+function renderCharts(ready){
+ const grid=$("chartsGrid");grid.innerHTML="";chartStates=[];const p=activeProject(),modes=p.evaluationModes||["prediction"];renderLegend(modes);
+ chartDefs.forEach((def,index)=>{const card=document.createElement("div");card.className="chart-card";const tag=modes.length===2?"预测 / 验证":modes[0]==="validation"?"验证":"预测";card.innerHTML=`<div class="chart-head"><div><div class="chart-name">总阵${def.type} · θ = ${def.theta}°</div><div class="chart-type">${def.type==="幅度"?"Amplitude · dB":"Phase · degree"}</div></div><span class="chart-tag">${ready?tag:"待执行"}</span></div><div class="chart-visual"></div><div class="chart-caption"><span>横轴：方位角 φ</span><span>${ready?"悬停查看具体数据":"等待结果"}</span></div>`;const visual=card.querySelector(".chart-visual");
+  if(ready){const canvas=document.createElement("canvas");canvas.setAttribute("aria-label",`总阵${def.type}交互图，theta ${def.theta} 度`);const tooltip=document.createElement("div");tooltip.className="chart-tooltip";visual.append(canvas,tooltip);const state={def,data:buildChartData(def,index),modes,hoverIndex:-1};chartStates.push({canvas,state});requestAnimationFrame(()=>{drawChart(canvas,state);attachChartInteraction(visual,canvas,state,tooltip)})}else visual.innerHTML=`<div class="chart-empty">${svgIcon("chart",28)}<span>执行任务后生成总阵方向图</span></div>`;grid.appendChild(card)});
+ $("resultDataNote").textContent=ready?`当前展示总阵${modes.length===2?"预测与验证对比":"结果"}；鼠标悬停曲线可查看 φ、θ 与具体数值，完整结果由接口返回并支持下载。`:"训练完成并执行任务后，结果数据会在此处以交互图展示；完整结果由后端结果接口提供并支持下载。";
+}
+function renderMetrics(ready){
+ const p=activeProject(),modes=p.evaluationModes||["prediction"];const defs=[
+  {label:"执行模式",value:ready?modes.map(x=>x==="prediction"?"预测":"验证").join(" + "):"—",unit:"",foot:ready?"本次任务选择":"等待任务",icon:"chart"},
+  {label:"预测阵元数",value:ready?String(expectedUnitCount()):"—",unit:"个",foot:"按预测阵列尺寸生成",icon:"grid"},
+  {label:"数据采样点",value:ready?"16,471":"—",unit:"点 / 图",foot:"θ、φ 每 2° 网格",icon:"chart"},
+  {label:"结果状态",value:ready?"已生成":"—",unit:"",foot:ready?"可查看并下载":"等待结果",icon:"check"}
+ ];
+ $("metricsGrid").innerHTML=defs.map(d=>`<div class="metric-card"><div class="metric-label"><span>${d.label}</span><span class="metric-mini">${svgIcon(d.icon,12)}</span></div><div class="metric-value" style="font-size:${d.value.length>8?16:24}px">${d.value}<span class="metric-unit"> ${d.unit}</span></div><div class="metric-foot">${d.foot}</div></div>`).join("");
+}
+
+function statusClass(status){return status==="running"||status==="queued"?"running":status==="succeeded"?"success":status==="failed"?"failed":status==="partial_success"?"partial":""}
+function statusLabel(status){return ({idle:"暂无任务",queued:"排队中",running:"执行中",succeeded:"成功",partial_success:"部分成功",failed:"失败",not_selected:"未选择"}[status]||status||"—")}
+function renderTaskStatus(){
+ const p=activeProject(),s=p.taskState||createTaskState();p.taskState=s;const overall=$("taskOverallTag"),overallClass=statusClass(s.status);overall.className="task-status-tag"+(overallClass?` ${overallClass}`:"");overall.innerHTML=`<span class="dot"></span>${statusLabel(s.status)}`;$("taskId").textContent=s.taskId||"—";$("taskStage").textContent=s.currentStage&&s.currentStage!=="idle"?`当前阶段：${s.currentStage}`:(s.message||"等待任务");
+ const setBranch=(statusId,messageId,value)=>{const el=$(statusId),message=$(messageId),cls=statusClass(value);el.className="branch-status"+(cls?` ${cls}`:"");el.textContent=statusLabel(value);message.textContent=value==="not_selected"?"本次任务未选择该分支":s.message||"等待任务"};setBranch("predictionTaskStatus","predictionTaskMessage",s.predictionStatus);setBranch("validationTaskStatus","validationTaskMessage",s.validationStatus);const error=$("taskError");error.hidden=!s.error;error.textContent=s.error||"";
+}
+function renderResultActions(){const ready=!!activeProject().resultReady;$("viewDataBtn").disabled=!ready;$("downloadBtn").disabled=!ready}
+function resultRecords(){
+ const p=activeProject(),modes=p.evaluationModes||["prediction"],amp=buildChartData(chartDefs[0],0),phase=buildChartData(chartDefs[3],3);const make=(mode)=>amp.slice(0,100).map((row,index)=>({"Phi[deg]":row.phi,"Theta[deg]":row.theta,"ECP_dB":Number((mode==="prediction"?row.prediction:row.validation).toFixed(6)),"ECP_Phase_deg":Number((mode==="prediction"?phase[index].prediction:phase[index].validation).toFixed(6))}));return {modes,prediction:modes.includes("prediction")?make("prediction"):null,validation:modes.includes("validation")?make("validation"):null};
+}
+function renderDataTable(){
+ const result=resultRecords(),head=$("resultDataTableHead"),body=$("resultDataTableBody");head.innerHTML="";body.innerHTML="";const ths=["Phi[deg]","Theta[deg]"];if(result.modes.includes("prediction"))ths.push("预测 ECP_dB","预测 ECP_Phase_deg");if(result.modes.includes("validation"))ths.push("验证 ECP_dB","验证 ECP_Phase_deg");head.innerHTML=`<tr>${ths.map(x=>`<th>${x}</th>`).join("")}</tr>`;const rows=result.prediction||result.validation||[];rows.forEach((row,index)=>{const val=(result.modes.includes("prediction")?result.prediction[index]:result.validation[index])||row;const cells=[row["Phi[deg]"],row["Theta[deg]"]];if(result.modes.includes("prediction"))cells.push(result.prediction[index]["ECP_dB"],result.prediction[index]["ECP_Phase_deg"]);if(result.modes.includes("validation"))cells.push(result.validation[index]["ECP_dB"],result.validation[index]["ECP_Phase_deg"]);body.insertAdjacentHTML("beforeend",`<tr>${cells.map(x=>`<td>${escapeHtml(x)}</td>`).join("")}</tr>`)});$("dataSummary").textContent=`总阵结果 · ${result.modes.map(x=>x==="prediction"?"预测":"验证").join(" / ")} · ${rows.length} 个预览点`;
+}
+function openDataModal(){if(!activeProject().resultReady)return;renderDataTable();$("dataModal").classList.add("open")}
+function closeDataModal(){$("dataModal").classList.remove("open")}
+function downloadResults(){if(!activeProject().resultReady)return;const p=activeProject(),result=resultRecords(),payload={task_id:p.taskState?.taskId||"task_demo",status:p.taskState?.status||"succeeded",mode:result.modes.length===2?"comparison":result.modes[0],total_array_result:{prediction:result.prediction?{records:result.prediction}:null,validation:result.validation?{records:result.validation}:null},note:"演示下载；正式版由 /api/v1/tasks/{task_id}/download 返回 ZIP 结果包。"};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${p.taskState?.taskId||"task"}_result_demo.json`;a.click();URL.revokeObjectURL(a.href);showToast("演示结果数据已下载。")}
+function renderAll(){renderProjectList();renderHeader();loadConfig(activeProject().config);renderFile();renderModeButtons();renderCharts(activeProject().resultReady);renderMetrics(activeProject().resultReady);renderTaskStatus();renderResultActions()}
+function showToast(message){$("toastText").textContent=message;$("toast").classList.add("show");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$("toast").classList.remove("show"),2800)}
+function openModal(){$("projectModal").classList.add("open");$("newName").value="";$("newDescription").value="";setTimeout(()=>$("newName").focus(),60)}
+function closeModal(){$("projectModal").classList.remove("open")}
+function renderPositionTable(){
+ const p=activeProject(),n=arraySize(),rows=makePositions(n,p.config.positions||[]);const body=$("positionTableBody");body.innerHTML="";$("positionModalMeta").textContent=`当前尺寸 ${n} × ${n}，共 ${rows.length} 个子单元。i、j 自动按行列顺序生成。`;
+ rows.forEach(row=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${row.unit_id}</td><td>${row.i}</td><td>${row.j}</td><td><input type="number" step="any" data-axis="x" data-index="${row.unit_id-1}" value="${row.x===""?"":escapeHtml(row.x)}" aria-label="第 ${row.unit_id} 个单元 x 坐标"></td><td><input type="number" step="any" data-axis="y" data-index="${row.unit_id-1}" value="${row.y===""?"":escapeHtml(row.y)}" aria-label="第 ${row.unit_id} 个单元 y 坐标"></td>`;body.appendChild(tr)});$("positionModalError").textContent="";
+}
+function openPositionModal(){renderPositionTable();$("positionModal").classList.add("open");setTimeout(()=>document.querySelector("#positionTableBody input")?.focus(),60)}
+function closePositionModal(){$("positionModal").classList.remove("open")}
+function savePositionModal(){
+ const p=activeProject(),rows=makePositions(arraySize());let error="";document.querySelectorAll("#positionTableBody input").forEach(input=>{const index=Number(input.dataset.index);rows[index][input.dataset.axis]=input.value.trim()});
+ if(rows.some(row=>row.x===""||row.y===""||!Number.isFinite(Number(row.x))||!Number.isFinite(Number(row.y))))error="请完整填写所有单元的 x、y，且必须是数字。";const seen=new Set();rows.forEach(row=>{const key=`${Number(row.x)}|${Number(row.y)}`;if(seen.has(key))error="存在重复的 x、y 位置，请修改后再保存。";seen.add(key)});if(error){$("positionModalError").textContent=error;return}
+ p.config.positions=rows;p.config.jsonPositions=null;p.config.jsonFileName="";p.config.positionSource="manual";closePositionModal();updatePositionSummary();showToast(`已保存 ${rows.length} 个子单元位置。`);
+}
+function normaliseImportedUnits(payload){
+ if(!payload||!Array.isArray(payload.units))throw new Error("JSON 必须包含 units 数组。");const count=Number(payload.unit_count);if(!Number.isInteger(count)||count!==payload.units.length)throw new Error("unit_count 必须等于 units 数组长度。");const expected=expectedUnitCount();if(count!==expected)throw new Error(`当前预测阵列尺寸需要 ${expected} 个单元，JSON 中为 ${count} 个。`);
+ const n=arraySize(),rows=payload.units.map((unit,index)=>{const x=Number(unit.x),y=Number(unit.y);if(!Number.isFinite(x)||!Number.isFinite(y))throw new Error(`第 ${index+1} 个单元的 x、y 必须是数字。`);return {unit_id:index+1,i:Math.floor(index/n)+1,j:index%n+1,x,y}});const seen=new Set();for(const row of rows){const key=`${row.x}|${row.y}`;if(seen.has(key))throw new Error("JSON 中存在重复的 x、y 位置。");seen.add(key)}return rows;
+}
+async function handlePositionFile(event){
+ const file=event.target.files?.[0];if(!file)return;const p=activeProject(),status=$("positionStatus");status.className="position-status";status.textContent="正在读取 JSON…";
+ try{const payload=JSON.parse(await file.text()),rows=normaliseImportedUnits(payload);p.config.jsonPositions=rows;p.config.jsonFileName=file.name;p.config.positionSource="json";p.config.positions=rows.map(row=>({...row}));updatePositionSummary();showToast(`JSON 已导入，后续请求优先使用 ${file.name}。`)}catch(error){p.config.jsonPositions=null;p.config.jsonFileName="";status.className="position-status error";status.textContent="JSON 无效";showToast(error.message||"JSON 文件解析失败。")}
+ event.target.value="";
+}
+function currentArrayInput(){const p=activeProject(),rows=p.config.jsonPositions?.length?p.config.jsonPositions:p.config.positions;return {unit_count:rows?.length||0,units:(rows||[]).map(row=>({...row,i:Number(row.i),j:Number(row.j),x:Number(row.x),y:Number(row.y)}))}}
+function openHelp(){showToast("流程：绑定 HFSS 工程 → 配置阵列尺寸 → 填写位置或导入 JSON → 选择预测/验证 → 执行任务。")}
+$("newProjectBtn").addEventListener("click",openModal);$("closeModal").addEventListener("click",closeModal);$("cancelModal").addEventListener("click",closeModal);$("projectModal").addEventListener("click",e=>{if(e.target===$("projectModal"))closeModal()});$("closeDataModal").addEventListener("click",closeDataModal);$("cancelDataModal").addEventListener("click",closeDataModal);$("dataModal").addEventListener("click",e=>{if(e.target===$("dataModal"))closeDataModal()});$("closePositionModal").addEventListener("click",closePositionModal);$("cancelPositionModal").addEventListener("click",closePositionModal);$("savePositionModal").addEventListener("click",savePositionModal);$("positionModal").addEventListener("click",e=>{if(e.target===$("positionModal"))closePositionModal()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closePositionModal();closeDataModal()}});
+$("projectForm").addEventListener("submit",e=>{e.preventDefault();const name=$("newName").value.trim();if(!name){$("newName").focus();return}const id=Math.max(...projects.map(p=>p.id))+1;projects.unshift({id,name,description:$("newDescription").value.trim()||"新的非规则阵列训练实验。",bound:false,checking:false,trained:false,training:false,evaluating:false,resultReady:false,evaluationModes:["prediction"],taskState:createTaskState(),config:{...defaults,positions:[],jsonPositions:null},created:"刚刚"});activeId=id;closeModal();renderAll();showToast("项目已创建，可以开始配置训练任务。")});
+$("projectSearch").addEventListener("input",renderProjectList);
+$("bindBtn").addEventListener("click",()=>{const p=activeProject();if(p.checking||p.training)return;p.bound=false;p.checking=true;p.taskState=createTaskState();renderAll();setTimeout(()=>{p.checking=false;p.bound=true;p.taskState=createTaskState({message:"工程已绑定，等待手动开始训练"});renderAll();showToast("HFSS 工程检查成功（演示状态）。")},1000)});
+$("trainSize").addEventListener("change",saveConfigFromInputs);
+$("predictSize").addEventListener("change",()=>{const p=activeProject();p.config.positions=[];p.config.jsonPositions=null;p.config.jsonFileName="";p.config.positionSource="manual";saveConfigFromInputs();renderCharts(p.resultReady);renderMetrics(p.resultReady)});
+$("openPositionBtn").addEventListener("click",openPositionModal);$("positionFileInput").addEventListener("change",handlePositionFile);$("clearPositionBtn").addEventListener("click",()=>{const p=activeProject();p.config.positions=[];p.config.jsonPositions=null;p.config.jsonFileName="";p.config.positionSource="manual";updatePositionSummary();showToast("已清除预测阵列位置输入。")});
+$("resetBtn").addEventListener("click",()=>{const p=activeProject();p.config=cloneConfig(defaults);p.resultReady=false;p.training=false;p.evaluating=false;p.taskState=createTaskState();loadConfig(p.config);renderCharts(false);renderMetrics(false);renderProjectList();renderTaskStatus();renderResultActions();showToast("训练配置和位置输入已恢复默认值。")});
+$("trainBtn").addEventListener("click",()=>{const p=activeProject();if(!p.bound||p.checking||p.training||p.evaluating)return;const taskId=`task_training_demo_${p.id}_${Date.now()}`;p.training=true;p.trained=false;p.resultReady=false;p.taskState=createTaskState({taskId,taskType:"training",status:"running",currentStage:"data_generation",message:"正在生成训练数据"});renderAll();showToast("训练任务已开始。");setTimeout(()=>{if(p.taskState.taskId!==taskId)return;p.taskState.currentStage="hfss_simulation";p.taskState.message="正在执行 HFSS 仿真与数据提取";renderAll()},700);setTimeout(()=>{if(p.taskState.taskId!==taskId)return;p.training=false;p.trained=true;p.taskState.status="succeeded";p.taskState.currentStage="model_training";p.taskState.message="模型训练完成，可执行评价";p.taskState.resultAvailable=false;renderAll();showToast("演示训练完成。接下来可执行预测或验证。")},1700)});
+
+document.querySelectorAll(".mode-btn").forEach(btn=>btn.addEventListener("click",()=>{const p=activeProject(),mode=btn.dataset.mode,modes=new Set(p.evaluationModes||[]);modes.has(mode)?modes.delete(mode):modes.add(mode);if(!modes.size){showToast("至少选择预测或验证其中一种模式。");return}p.evaluationModes=[...modes];renderModeButtons();renderCharts(p.resultReady);renderMetrics(p.resultReady)}));
+$("evaluateBtn").addEventListener("click",()=>{const p=activeProject(),modes=p.evaluationModes||[];if(!modes.length){showToast("至少选择预测或验证其中一种模式。");return}if(modes.includes("prediction")&&!p.trained){showToast("模型尚未训练完成，不能执行预测。");return}if(modes.includes("validation")&&!p.bound){showToast("HFSS 工程尚未绑定，不能执行验证。");return}const input=currentArrayInput();if(input.unit_count!==expectedUnitCount()){showToast("请先完成全部子单元位置输入。");return}const taskId=`task_eval_demo_${p.id}_${Date.now()}`;p.evaluating=true;p.resultReady=false;p.taskState=createTaskState({taskId,taskType:"evaluation",status:"running",currentStage:modes.includes("validation")?"validation":"prediction",predictionStatus:modes.includes("prediction")?"running":"not_selected",validationStatus:modes.includes("validation")?"running":"not_selected",message:"评价任务执行中"});renderAll();showToast(`正在执行${modes.map(m=>m==="prediction"?"预测":"验证").join("与")}任务…`);setTimeout(()=>{if(p.taskState.taskId!==taskId)return;if(modes.includes("prediction")){p.taskState.predictionStatus="succeeded";p.taskState.currentStage=modes.includes("validation")?"validation":"result_persist";p.taskState.message=modes.includes("validation")?"预测完成，正在执行验证":"正在保存预测结果"}renderAll()},700);setTimeout(()=>{if(p.taskState.taskId!==taskId)return;if(modes.includes("validation")){p.taskState.validationStatus="succeeded";p.taskState.currentStage="result_persist"}p.taskState.status="succeeded";p.taskState.resultAvailable=true;p.taskState.message="结果已生成";p.evaluating=false;p.resultReady=true;renderAll();showToast("任务完成，结果已生成。")},1500)});
+
+$("viewDataBtn").addEventListener("click",openDataModal);$("downloadBtn").addEventListener("click",downloadResults);$("helpBtn").addEventListener("click",openHelp);
+$("exportBtn").addEventListener("click",()=>{const p=activeProject(),payload={project:{name:p.name,description:p.description},hfss:{bound:p.bound,path:p.bound?FIXED_HFSS_PATH:null},input:currentArrayInput(),modes:p.evaluationModes||["prediction"],note:"Prototype only; replace demo actions with the API calls documented in api.md."};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(p.name.replace(/[\\/:*?"<>|]/g,"_")||"arraylab")+"_config.json";a.click();URL.revokeObjectURL(a.href);showToast("已导出当前配置和阵列输入 JSON。")});
+window.addEventListener("resize",()=>chartStates.forEach(({canvas,state})=>drawChart(canvas,state,state.hoverIndex)));
+renderAll();
+</script>
+</body>
+</html>
+

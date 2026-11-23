@@ -1,0 +1,511 @@
+# 文件基本信息：openapi.yaml
+# 用途：机器可读的 /api/v1 OpenAPI 契约。
+# 维护：修改后同步目录索引和相关契约/测试。
+
+openapi: 3.0.3
+info:
+  title: 非规则阵列方向图预测工具 API
+  version: 1.0.0
+  description: |
+    用于 HFSS 工程绑定、手动启动训练、阵列预测、HFSS 验证、任务状态查询和结果下载。
+    结果方向图字段沿用现有实验代码输出格式。
+servers:
+  - url: http://localhost:8000
+    description: 本机开发服务
+
+tags:
+  - name: projects
+    description: 项目和模型
+  - name: tasks
+    description: 异步任务
+  - name: results
+    description: 任务结果
+
+paths:
+  /api/v1/projects:
+    get:
+      tags: [projects]
+      summary: 获取项目列表
+      description: 返回前端项目列表所需的项目绑定状态和模型状态。
+      operationId: listProjects
+      responses:
+        '200':
+          description: 项目列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+    post:
+      tags: [projects]
+      summary: 绑定 HFSS 工程并创建项目
+      description: 接收本机 HFSS 工程文件的绝对路径。系统按该路径启动 HFSS，不上传或复制工程文件；绑定成功后项目进入 ready_to_train，训练由用户随后显式启动。
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+      responses:
+        '201':
+          description: 项目已绑定，等待用户启动训练
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{project_id}:
+    get:
+      tags: [projects]
+      summary: 查询项目和模型状态
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 项目状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/projects/{project_id}/training-tasks:
+    post:
+      tags: [tasks]
+      summary: 开始训练
+      description: 用户显式启动训练任务。项目必须已经成功绑定 HFSS 工程；训练在后台生成训练数据、执行小阵列仿真、提取数据并训练模型。
+      operationId: createTrainingTask
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '202':
+          description: 训练任务已进入后台
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingTaskCreateResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{project_id}/evaluation-tasks:
+    post:
+      tags: [tasks]
+      summary: 创建预测或验证任务
+      description: 至少选择 prediction 或 validation 其中一种模式；选择 prediction 时项目必须有可用模型，选择 validation 时项目必须有可调用的 HFSS 环境；两个模式使用同一份标准化输入。
+      operationId: createEvaluationTask
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationTaskCreateRequest'
+      responses:
+        '202':
+          description: 评价任务已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationTaskCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/tasks/{task_id}:
+    get:
+      tags: [tasks]
+      summary: 查询任务状态
+      description: 前端在任务处于 queued 或 running 时轮询此接口，任务进入终态后停止轮询。
+      operationId: getTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 任务状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tasks/{task_id}/results:
+    get:
+      tags: [results]
+      summary: 获取任务结果
+      description: 页面展示总阵结果；完整子单元结果和文件通过下载接口获取。双模式成功时返回预测和验证两组总阵记录。
+      operationId: getTaskResults
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 任务结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResults'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 结果尚未准备好
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tasks/{task_id}/download:
+    get:
+      tags: [results]
+      summary: 下载任务完整结果包
+      description: 一个任务下载一个完整压缩包，包含子单元结果、总阵结果、对比图、误差数据和任务元数据。
+      operationId: downloadTaskResults
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: ZIP 结果包
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 结果尚未准备好
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      description: 项目唯一标识
+      schema:
+        type: string
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      description: 任务唯一标识
+      schema:
+        type: string
+
+  schemas:
+    ProjectCreateRequest:
+      type: object
+      required: [hfss_project_path]
+      properties:
+        hfss_project_path:
+          type: string
+          description: 本机 HFSS 工程文件绝对路径；第一版不接受压缩包或普通文件。
+          example: 'E:\\projects\\a.aedt'
+
+    ProjectCreateResponse:
+      type: object
+      required: [project_id, status]
+      properties:
+        project_id:
+          type: string
+          example: project_001
+        status:
+          type: string
+          enum: [ready_to_train]
+
+    ProjectListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+
+    TrainingTaskCreateResponse:
+      type: object
+      required: [task_id, project_id, status]
+      properties:
+        task_id:
+          type: string
+          example: task_training_001
+        project_id:
+          type: string
+          example: project_001
+        status:
+          type: string
+          enum: [queued]
+
+    Project:
+      type: object
+      required: [project_id, project_name, hfss_project_name, model_status, created_at, updated_at]
+      properties:
+        project_id:
+          type: string
+        project_name:
+          type: string
+        hfss_project_name:
+          type: string
+        model_status:
+          type: string
+          enum: [unbound, training, ready, failed, invalid]
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    EvaluationTaskCreateRequest:
+      type: object
+      description: 前端可以做简单预校验；服务端必须执行复杂校验、规范化和最终判定。网页输入与 JSON 输入同时存在时，JSON 为权威来源。
+      required: [input, modes]
+      properties:
+        input:
+          $ref: '#/components/schemas/ArrayInput'
+        modes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [prediction, validation]
+          description: 至少选择一种模式。
+
+    ArrayInput:
+      type: object
+      required: [unit_count, units]
+      properties:
+        unit_count:
+          type: integer
+          minimum: 1
+        units:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/UnitPosition'
+
+    UnitPosition:
+      type: object
+      required: [unit_id, i, j, x, y]
+      properties:
+        unit_id:
+          type: integer
+          minimum: 1
+        i:
+          type: integer
+          minimum: 1
+          description: 对外从 1 开始，内部转换为算法索引。
+        j:
+          type: integer
+          minimum: 1
+          description: 对外从 1 开始，内部转换为算法索引。
+        x:
+          type: number
+          description: 单位 mil。
+        y:
+          type: number
+          description: 单位 mil。
+
+    EvaluationTaskCreateResponse:
+      type: object
+      required: [task_id, project_id, status]
+      properties:
+        task_id:
+          type: string
+        project_id:
+          type: string
+        status:
+          type: string
+          enum: [queued]
+
+    Task:
+      type: object
+      required: [task_id, project_id, task_type, status, current_stage, result_available]
+      properties:
+        task_id:
+          type: string
+        project_id:
+          type: string
+        task_type:
+          type: string
+          enum: [training, evaluation]
+        status:
+          type: string
+          enum: [queued, running, succeeded, partial_success, failed, validation_failed]
+        current_stage:
+          type: string
+          description: 当前阶段，例如 data_generation、hfss_simulation、model_training、prediction、validation、result_persist。
+        prediction_status:
+          type: string
+          nullable: true
+          enum: [not_selected, queued, running, succeeded, failed]
+        validation_status:
+          type: string
+          nullable: true
+          enum: [not_selected, queued, running, succeeded, failed]
+        message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        result_available:
+          type: boolean
+        error:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ErrorInfo'
+
+    PatternRecord:
+      type: object
+      required: ['Phi[deg]', 'Theta[deg]', ECP_dB, ECP_Phase_deg]
+      properties:
+        'Phi[deg]':
+          type: number
+          description: Phi 角度，单位 degree。
+        'Theta[deg]':
+          type: number
+          description: Theta 角度，单位 degree。
+        ECP_dB:
+          type: number
+          description: ECP 幅度，单位 dB。
+        ECP_Phase_deg:
+          type: number
+          description: ECP 相位，单位 degree。
+
+    PatternResult:
+      type: object
+      required: [records]
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatternRecord'
+
+    TaskResults:
+      type: object
+      required: [task_id, status, mode, total_array_result, files]
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+          enum: [succeeded, partial_success]
+        mode:
+          type: string
+          enum: [prediction, validation, comparison]
+        total_array_result:
+          type: object
+          properties:
+            prediction:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/PatternResult'
+            validation:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/PatternResult'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artifact'
+
+    Artifact:
+      type: object
+      required: [name, type, source, downloadable]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [unit_data, total_array_data, comparison_plot, metric, metadata]
+        source:
+          type: string
+          enum: [prediction, validation, comparison, common]
+        downloadable:
+          type: boolean
+
+    ErrorInfo:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - PROJECT_PATH_INVALID
+            - PROJECT_BIND_FAILED
+            - INPUT_INVALID
+            - MODE_REQUIRED
+            - MODEL_NOT_READY
+            - DUPLICATE_POSITION
+            - TASK_FAILED
+            - RESULT_NOT_READY
+            - DOWNLOAD_FAILED
+            - INTERNAL_ERROR
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+        reason:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorInfo'
+
+  responses:
+    BadRequest:
+      description: 请求格式或参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 项目、任务或结果不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: 当前状态不允许执行
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: 系统内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+

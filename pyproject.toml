@@ -1,0 +1,17 @@
+# 文件基本信息：pyproject.toml
+# 用途：统一 pytest 自动化测试发现、标记和报告配置。
+# 维护：修改测试布局或门禁时同步 tests/目录索引.md、验证规范.md 和根目录索引。
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra"
+markers = [
+  "unit: 纯逻辑和边界测试",
+  "integration: 数据库、文件、任务和适配层集成测试",
+  "contract: OpenAPI 契约测试",
+  "e2e: 关键用户流程测试",
+  "hfss_server: 仅在服务器 HFSS 环境执行的人工/集成验收",
+]
