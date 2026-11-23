@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from backend.cleanup import cleanup_expired
+from backend.cleanup import _cleanup_worker, cleanup_expired
 
 
 @pytest.mark.unit
@@ -44,3 +44,13 @@ def test_cleanup_missing_root_is_non_blocking(tmp_path):
 
     report = cleanup_expired(tmp_path / "missing")
     assert report.to_dict() == {"removed": [], "failures": []}
+
+
+@pytest.mark.unit
+def test_cleanup_worker_persists_report(tmp_path):
+    """验证独立清理进程入口写入 cleanup.log。"""
+
+    _cleanup_worker(str(tmp_path), 90)
+    log = tmp_path / "cleanup.log"
+    assert log.is_file()
+    assert '"removed": []' in log.read_text(encoding="utf-8")

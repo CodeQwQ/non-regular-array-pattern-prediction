@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import multiprocessing
+import json
 import shutil
 import time
 from dataclasses import dataclass, field
@@ -65,9 +66,17 @@ def cleanup_expired(data_root: str | Path, now: datetime | None = None, retentio
 
 
 def _cleanup_worker(data_root: str, retention_days: int) -> None:
-    """独立进程入口；参数为数据根目录和保留天数，结果写入日志由调用方负责。"""
+    """独立进程入口；参数为数据根目录和保留天数，报告持久化到 cleanup.log。"""
 
-    cleanup_expired(data_root, retention_days=retention_days)
+    root = Path(data_root)
+    root.mkdir(parents=True, exist_ok=True)
+    try:
+        report = cleanup_expired(root, retention_days=retention_days)
+        payload = {"created_at": datetime.now(timezone.utc).isoformat(), **report.to_dict()}
+    except Exception as exc:  # pragma: no cover - 防止清理进程静默退出
+        payload = {"created_at": datetime.now(timezone.utc).isoformat(), "removed": [], "failures": [{"path": str(root), "reason": str(exc)}]}
+    with (root / "cleanup.log").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
 def start_cleanup_process(data_root: str | Path, retention_days: int = 90) -> multiprocessing.Process:

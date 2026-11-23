@@ -15,3 +15,4 @@
 - 清理 `data/<project>/temp` 和 `output` 下超过 `ARRAYLAB_RETENTION_DAYS`（默认 90 天）的子项。
 - 清理在独立进程中运行，主服务不等待其完成。
 - 单个文件/目录失败记录到报告，不阻断主系统；下一次启动再次尝试。
+- 独立进程将清理报告追加写入 `<data_root>/cleanup.log`，可关联清理时间和失败路径。
