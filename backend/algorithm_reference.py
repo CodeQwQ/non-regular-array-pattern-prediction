@@ -88,7 +88,7 @@ def build_zn(g_ave: Sequence[complex], u_list: Sequence[float], v_list: Sequence
         raise ValueError("g_ave、u_list、v_list 长度必须一致")
     if len(m_flat) != len(n_flat):
         raise ValueError("m_flat、n_flat 长度必须一致")
-    return [[complex(gain) * cmath.exp(1j * beta * ((m - center_comp) * dx * u + (n - center_comp) * dy * v)) for m, n in zip(m_flat, n_flat)] for gain, u, v in zip(g_ave, u_list, v_list)]
+    return [[complex(gain) * cmath.exp(1j * beta * ((center_comp + n - 1) * dx * u + (center_comp + m - 1) * dy * v)) for m, n in zip(m_flat, n_flat)] for gain, u, v in zip(g_ave, u_list, v_list)]
 
 
 def validate_pattern_records(records: Sequence[dict[str, Any]]) -> None:
@@ -156,7 +156,7 @@ def build_virtual_grid(rows: int = VIRTUAL_GRID_ROWS, cols: int = VIRTUAL_GRID_C
         for m in range(1, rows + 1):
             m_flat.append(m)
             n_flat.append(n)
-            positions.append(((m + center_comp) * dx, (n + center_comp) * dy))
+            positions.append(((m - 1 + center_comp) * dx, (n - 1 + center_comp) * dy))
     return {"m_flat": m_flat, "n_flat": n_flat, "positions_m": positions, "rows": rows, "cols": cols, "dx": dx, "dy": dy, "center_comp": center_comp}
 
 

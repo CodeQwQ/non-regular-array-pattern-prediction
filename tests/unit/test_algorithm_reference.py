@@ -51,7 +51,7 @@ def test_build_zn_matches_complex_phase_formula():
     """验证不显式构造 G 对角矩阵时的 Z 单元值。"""
 
     result = build_zn([2 + 0j], [1.0], [0.0], [0], [0], 2.0, 0.5, 0.5, -0.5)
-    expected = 2 * cmath.exp(1j * (2.0 * 0.25))
+    expected = 2 * cmath.exp(1j * (2.0 * (-1.5 * 0.5)))
     assert result[0][0].real == pytest.approx(expected.real)
     assert result[0][0].imag == pytest.approx(expected.imag)
 
