@@ -34,6 +34,10 @@ test_ecp_real/
 Thumbs.db
 Desktop.ini
 
+# Frontend dependency and build outputs
+frontend/node_modules/
+frontend/dist/
+
 # HFSS/AEDT generated files and local caches
 *.lock
 *.aedt.lock
