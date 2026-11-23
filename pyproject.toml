@@ -7,7 +7,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-ra"
+# 本地默认不执行需要真实 HFSS 的测试；服务器验收作业必须显式使用 `pytest -m hfss_server`。
+addopts = '-ra -m "not hfss_server"'
 markers = [
   "unit: 纯逻辑和边界测试",
   "integration: 数据库、文件、任务和适配层集成测试",
