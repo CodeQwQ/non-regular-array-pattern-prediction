@@ -17,6 +17,7 @@ from typing import Any
 from .algorithm import StubPredictionEngine
 from .data_io import load_pattern_csv
 from .config import Settings
+from .cleanup import start_cleanup_process
 from .errors import AppError
 from .hfss_adapter import StubHFSSAdapter, UnavailableHFSSAdapter
 from .storage import SQLiteStore
@@ -33,6 +34,7 @@ class Application:
         self.settings = settings or Settings.from_env()
         self.settings.ensure_directories()
         self.store = store or SQLiteStore(self.settings.db_path)
+        self.cleanup_process = start_cleanup_process(self.settings.data_root, self.settings.retention_days) if self.settings.cleanup_enabled else None
         adapter = StubHFSSAdapter() if self.settings.hfss_mode == "stub" else UnavailableHFSSAdapter()
         predictor = self._build_predictor()
         self.tasks = TaskManager(self.settings, self.store, adapter, predictor)
@@ -55,6 +57,8 @@ class Application:
         """关闭后台资源；无参数，返回 None。"""
 
         self.tasks.close()
+        if self.cleanup_process is not None and self.cleanup_process.is_alive():
+            self.cleanup_process.join(timeout=2)
 
     def create_project(self, payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         """绑定 HFSS 工程并创建项目。

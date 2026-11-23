@@ -26,6 +26,8 @@ class Settings:
     predictor_mode: str = "stub"
     average_pattern_path: Path | None = None
     model_path: Path | None = None
+    cleanup_enabled: bool = False
+    retention_days: int = 90
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -46,6 +48,8 @@ class Settings:
             predictor_mode=os.getenv("ARRAYLAB_PREDICTOR_MODE", "stub").lower(),
             average_pattern_path=Path(os.environ["ARRAYLAB_AVERAGE_PATTERN_PATH"]) if os.getenv("ARRAYLAB_AVERAGE_PATTERN_PATH") else None,
             model_path=Path(os.environ["ARRAYLAB_MODEL_PATH"]) if os.getenv("ARRAYLAB_MODEL_PATH") else None,
+            cleanup_enabled=os.getenv("ARRAYLAB_CLEANUP_ENABLED", "0") == "1",
+            retention_days=int(os.getenv("ARRAYLAB_RETENTION_DAYS", "90")),
             max_hfss_workers=min(4, max(1, int(os.getenv("ARRAYLAB_HFSS_WORKERS", "4")))),
         )
 
