@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "status": "deterministic_pure_function_baseline",
+  "algorithm_id": "ALG-EQ-001",
+  "fixtures": [
+    "golden_input/feature_center_3x3.json",
+    "golden_output/feature_center_3x3.json",
+    "golden_input/z_small.json",
+    "golden_output/z_small.json"
+  ],
+  "scope": ["3x3 feature order", "8-neighbor mapping", "virtual Z phase formula"],
+  "real_hfss_data": false,
+  "model_quality_threshold": null
+}
