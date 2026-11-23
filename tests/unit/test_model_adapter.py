@@ -10,6 +10,8 @@ import pytest
 
 from backend.errors import AppError
 from backend.model_adapter import XGBoostCnModel, validate_model_matrices
+from backend.application import Application
+from backend.config import Settings
 
 
 @pytest.mark.unit
@@ -29,4 +31,13 @@ def test_untrained_model_has_stable_error():
 
     with pytest.raises(AppError) as exc:
         XGBoostCnModel().predict([[0.0] * 9])
+    assert exc.value.code == "MODEL_NOT_READY"
+
+
+@pytest.mark.unit
+def test_reference_predictor_requires_explicit_artifacts(tmp_path):
+    """验证 reference 模式不会在缺少模型/平均 ECP 时回退到 stub。"""
+
+    with pytest.raises(AppError) as exc:
+        Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "reference", None, None))
     assert exc.value.code == "MODEL_NOT_READY"

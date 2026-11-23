@@ -23,6 +23,9 @@ class Settings:
     data_root: Path
     hfss_mode: str = "stub"
     max_hfss_workers: int = 4
+    predictor_mode: str = "stub"
+    average_pattern_path: Path | None = None
+    model_path: Path | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -40,6 +43,9 @@ class Settings:
             db_path=Path(os.getenv("ARRAYLAB_DB_PATH", str(project_root / "arraylab.sqlite3"))),
             data_root=Path(os.getenv("ARRAYLAB_DATA_ROOT", str(default_data))),
             hfss_mode=os.getenv("ARRAYLAB_HFSS_MODE", "stub").lower(),
+            predictor_mode=os.getenv("ARRAYLAB_PREDICTOR_MODE", "stub").lower(),
+            average_pattern_path=Path(os.environ["ARRAYLAB_AVERAGE_PATTERN_PATH"]) if os.getenv("ARRAYLAB_AVERAGE_PATTERN_PATH") else None,
+            model_path=Path(os.environ["ARRAYLAB_MODEL_PATH"]) if os.getenv("ARRAYLAB_MODEL_PATH") else None,
             max_hfss_workers=min(4, max(1, int(os.getenv("ARRAYLAB_HFSS_WORKERS", "4")))),
         )
 

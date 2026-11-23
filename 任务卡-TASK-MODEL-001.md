@@ -17,6 +17,7 @@
 - 输出固定为 2 列：`cn_real`、`cn_imag`。
 - 未安装 xgboost 时返回明确依赖错误，不伪造训练成功。
 - 旧脚本的 `skiprows=26` 不进入适配器；数据读取由 `data_io.py` 严格校验。
+- `ARRAYLAB_PREDICTOR_MODE=reference` 必须同时配置平均 ECP 和模型文件；缺失时明确失败，不回退到 stub。
 
 ## 待完成
 

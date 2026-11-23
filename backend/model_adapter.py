@@ -81,6 +81,29 @@ class XGBoostCnModel:
             raise AppError("TASK_FAILED", f"XGBoost cn 模型训练失败：{exc}", 500) from exc
         self._model = model
 
+    def load(self, path: str | Path) -> None:
+        """加载已有 XGBoost 模型产物。
+
+        参数：path 为模型文件路径。
+        返回：无；文件或依赖无效时抛出 AppError。
+        """
+
+        model_path = Path(path)
+        if not model_path.is_file():
+            raise AppError("MODEL_NOT_READY", f"模型文件不存在：{model_path}", 409)
+        xgb = self._load_xgb()
+        model = xgb.XGBRegressor(
+            n_estimators=self.params.n_estimators,
+            learning_rate=self.params.learning_rate,
+            max_depth=self.params.max_depth,
+            random_state=self.params.random_state,
+        )
+        try:
+            model.load_model(model_path)
+        except Exception as exc:
+            raise AppError("MODEL_NOT_READY", f"模型文件加载失败：{exc}", 409) from exc
+        self._model = model
+
     def predict(self, features: Sequence[Sequence[float]]) -> list[list[float]]:
         """预测 cn 实部/虚部。
 

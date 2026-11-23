@@ -15,12 +15,15 @@ from pathlib import Path
 from typing import Any
 
 from .algorithm import StubPredictionEngine
+from .data_io import load_pattern_csv
 from .config import Settings
 from .errors import AppError
 from .hfss_adapter import StubHFSSAdapter, UnavailableHFSSAdapter
 from .storage import SQLiteStore
 from .task_manager import TaskManager
 from .validation import normalise_array_input
+from .model_adapter import XGBoostCnModel
+from .reference_engine import ReferencePredictionEngine
 
 
 class Application:
@@ -31,7 +34,22 @@ class Application:
         self.settings.ensure_directories()
         self.store = store or SQLiteStore(self.settings.db_path)
         adapter = StubHFSSAdapter() if self.settings.hfss_mode == "stub" else UnavailableHFSSAdapter()
-        self.tasks = TaskManager(self.settings, self.store, adapter, StubPredictionEngine())
+        predictor = self._build_predictor()
+        self.tasks = TaskManager(self.settings, self.store, adapter, predictor)
+
+    def _build_predictor(self):
+        """根据配置构造 stub 或真实参考预测引擎；参数无，返回 PredictionEngine。"""
+
+        if self.settings.predictor_mode == "stub":
+            return StubPredictionEngine()
+        if self.settings.predictor_mode != "reference":
+            raise AppError("INTERNAL_ERROR", f"未知预测模式：{self.settings.predictor_mode}", 500)
+        if self.settings.average_pattern_path is None or self.settings.model_path is None:
+            raise AppError("MODEL_NOT_READY", "reference 模式必须配置平均 ECP 文件和模型文件", 409)
+        pattern = load_pattern_csv(self.settings.average_pattern_path)
+        model = XGBoostCnModel()
+        model.load(self.settings.model_path)
+        return ReferencePredictionEngine(model, pattern)
 
     def close(self) -> None:
         """关闭后台资源；无参数，返回 None。"""
