@@ -12,7 +12,7 @@ import json
 import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +105,7 @@ class TaskManager:
         """后台执行评价分支并生成单/双模式结果。"""
 
         branch_results: dict[str, dict[str, Any]] = {}
+        branch_errors: dict[str, dict[str, Any]] = {}
         artifacts: list[dict[str, Any]] = []
         result_dir: Path | None = None
         staging_dir: Path | None = None
@@ -129,9 +130,11 @@ class TaskManager:
                     artifacts.extend(branch_artifacts)
                     self.store.update_task(task_id, **{f"{mode}_status": "succeeded"}, message=f"{mode} 分支完成")
                 except AppError as exc:
+                    branch_errors[mode] = exc.to_dict()
                     self.store.update_task(task_id, **{f"{mode}_status": "failed"}, message=exc.message, error=exc.to_dict())
                 except Exception as exc:  # pragma: no cover
-                    self.store.update_task(task_id, **{f"{mode}_status": "failed"}, message=str(exc), error={"code": "TASK_FAILED", "message": str(exc)})
+                    branch_errors[mode] = {"error": {"code": "TASK_FAILED", "message": str(exc)}}
+                    self.store.update_task(task_id, **{f"{mode}_status": "failed"}, message=str(exc), error=branch_errors[mode])
 
             succeeded = [mode for mode in modes if mode in branch_results]
             if len(succeeded) == len(modes):
@@ -159,18 +162,23 @@ class TaskManager:
                 )
                 for mode in succeeded
             }
+            metadata = {
+                "task_id": task_id,
+                "project_id": project.project_id,
+                "project_name": project.project_name,
+                "modes": modes,
+                "model_version": project.model_version,
+                "input_snapshot": "input.json",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "branch_status": {mode: "succeeded" if mode in succeeded else "failed" for mode in modes},
+                "branch_errors": branch_errors,
+                "implementations": implementations,
+                "provenance": provenance,
+                "hfss_mode": getattr(self.hfss, "mode", "unknown"),
+                "status": status,
+            }
             (staging_dir / "metadata.json").write_text(
-                json.dumps(
-                    {
-                        "task_id": task_id,
-                        "implementations": implementations,
-                        "provenance": provenance,
-                        "hfss_mode": getattr(self.hfss, "mode", "unknown"),
-                        "status": status,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
+                json.dumps(metadata, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
             artifacts.insert(0, {"name": "metadata.json", "type": "metadata", "source": "common", "downloadable": True})

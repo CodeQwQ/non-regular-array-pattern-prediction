@@ -6,6 +6,7 @@
 维护：行为变化同步验收场景、追踪矩阵和集成目录索引。
 """
 
+import json
 import time
 from pathlib import Path
 
@@ -87,8 +88,13 @@ def test_training_prediction_result_and_download(tmp_path: Path):
         assert result["mode"] == "prediction"
         assert len(result["total_array_result"]["prediction"]["records"]) == 16471
         metadata = next(path for path in (tmp_path / "data").rglob("metadata.json"))
-        assert metadata.read_text(encoding="utf-8").find('"implementations": {') >= 0
-        assert '"stub"' in metadata.read_text(encoding="utf-8")
+        metadata_payload = json.loads(metadata.read_text(encoding="utf-8"))
+        assert metadata_payload["project_id"] == project_response["project_id"]
+        assert metadata_payload["modes"] == ["prediction"]
+        assert metadata_payload["branch_status"] == {"prediction": "succeeded"}
+        assert metadata_payload["input_snapshot"] == "input.json"
+        assert metadata_payload["provenance"] == {"prediction": "prediction_engine"}
+        assert metadata_payload["implementations"] == {"prediction": "stub"}
         archive, filename = app.download_results(evaluation["task_id"])
         assert archive[:2] == b"PK"
         assert filename.endswith(".zip")
