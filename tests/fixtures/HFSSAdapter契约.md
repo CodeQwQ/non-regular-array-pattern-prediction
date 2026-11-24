@@ -17,6 +17,18 @@
 - 方向图字段 `Phi[deg]`、`Theta[deg]`、`ECP_dB`、`ECP_Phase_deg`；
 - Theta/Phi 网格、单位、采样点数、输出文件和任务关联信息。
 
+验证 runner 成功时还必须在返回字典的 `result` 字段提供标准结果对象：
+
+```json
+{
+  "implementation": "hfss_com",
+  "units": {"1": [{"Phi[deg]": 0, "Theta[deg]": 0, "ECP_dB": 0, "ECP_Phase_deg": 0}]},
+  "total_array": {"records": [{"Phi[deg]": 0, "Theta[deg]": 0, "ECP_dB": 0, "ECP_Phase_deg": 0}]}
+}
+```
+
+真实适配器没有 `result` 时必须进入失败状态；开发 stub 可以由预测替身补齐结果，但这不构成真实 HFSS 验收证据。
+
 ## 必须可注入的失败
 
 工程路径无效、HFSS 启动失败、COM 调用失败、超时、异常退出、并发资源不足、导出缺列/缺行、写盘失败、取消和残留进程。

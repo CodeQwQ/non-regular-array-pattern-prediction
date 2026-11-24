@@ -15,6 +15,7 @@
 
 - 记录 RUN-ID、commit、Windows/HFSS/COM/许可证版本、工程文件和数据 hash。
 - `ARRAYLAB_HFSS_MODE=real` 通过 RealHFSSAdapter 延迟加载实验 HFSS 类；训练/验证 runner 必须在服务器任务配置中注入。
+- 验证 runner 成功返回时必须提供标准 `result`（`units` + `total_array`）；缺失结果由任务编排标记失败，不使用预测替身冒充真实验证。
 - 先执行环境测试，再执行绑定、训练、验证、双模式、并发上限和资源释放场景。
 - 失败必须保留日志、截图、任务状态、进程时间线和结果目录；不能以 stub 结果替代。
 - 通过结论由服务器验收人员和审批人共同回填 `变更追踪矩阵.md`。

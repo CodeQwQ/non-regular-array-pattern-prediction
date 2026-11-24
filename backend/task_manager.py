@@ -113,8 +113,9 @@ class TaskManager:
                 self.store.update_task(task_id, **{f"{mode}_status": "running"}, current_stage=mode, message=f"正在执行 {mode} 分支")
                 try:
                     if mode == "validation":
-                        self.hfss.run_validation(project.project_id, task_id, array_input.to_dict())
-                    branch_results[mode] = self.predictor.predict(array_input, mode)
+                        branch_results[mode] = self._run_validation(project.project_id, task_id, array_input)
+                    else:
+                        branch_results[mode] = self.predictor.predict(array_input, mode)
                     branch_artifacts = self._write_branch(result_dir, mode, branch_results[mode])
                     artifacts.extend(branch_artifacts)
                     self.store.update_task(task_id, **{f"{mode}_status": "succeeded"}, message=f"{mode} 分支完成")
@@ -132,13 +133,46 @@ class TaskManager:
                 status = "failed"
             mode_name = "comparison" if set(succeeded) == {"prediction", "validation"} else (succeeded[0] if succeeded else modes[0])
             payload = {"task_id": task_id, "status": status, "mode": mode_name, "total_array_result": {mode: branch_results[mode].get("total_array") for mode in succeeded}, "files": artifacts}
-            (result_dir / "metadata.json").write_text(json.dumps({"task_id": task_id, "implementation": "stub", "status": status}, ensure_ascii=False, indent=2), encoding="utf-8")
+            implementations = {
+                mode: branch_results[mode].get("implementation", getattr(self.predictor, "implementation", type(self.predictor).__name__))
+                for mode in succeeded
+            }
+            (result_dir / "metadata.json").write_text(
+                json.dumps(
+                    {
+                        "task_id": task_id,
+                        "implementations": implementations,
+                        "hfss_mode": getattr(self.hfss, "mode", "unknown"),
+                        "status": status,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
             artifacts.insert(0, {"name": "metadata.json", "type": "metadata", "source": "common", "downloadable": True})
             self.store.save_result(task_id, mode_name, payload, artifacts, str(result_dir))
             self.store.update_task(task_id, status=status, current_stage="result_persist", result_available=bool(succeeded), message="结果已生成" if succeeded else "评价任务失败")
         except Exception as exc:  # pragma: no cover
             error = {"code": "INTERNAL_ERROR", "message": str(exc)}
             self.store.update_task(task_id, status="failed", current_stage="result_persist", message=str(exc), error=error)
+
+    def _run_validation(self, project_id: str, task_id: str, array_input: ArrayInput) -> dict[str, Any]:
+        """执行 HFSS 验证并取得方向图结果。
+
+        参数：project_id 为项目标识；task_id 为任务标识；array_input 为规范化阵列输入。
+        返回：包含 `units` 和 `total_array` 的标准结果字典。开发 stub 未返回结果时使用
+        预测替身保持本地流程可测；真实适配器缺少方向图结果时明确失败，禁止伪造验证通过。
+        """
+
+        adapter_response = self.hfss.run_validation(project_id, task_id, array_input.to_dict())
+        if isinstance(adapter_response, dict):
+            result = adapter_response.get("result")
+            if isinstance(result, dict) and "units" in result and "total_array" in result:
+                return result
+        if getattr(self.hfss, "mode", "unknown") == "stub":
+            return self.predictor.predict(array_input, "validation")
+        raise AppError("TASK_FAILED", "HFSS 验证未返回标准方向图结果", 500)
 
     def _result_dir(self, project: Project, task_id: str) -> Path:
         """计算项目任务结果目录；参数为项目和任务 ID，返回目录路径。"""

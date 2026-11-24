@@ -13,6 +13,29 @@ import pytest
 
 from backend.application import Application
 from backend.config import Settings
+from backend.errors import AppError
+from backend.models import ArrayInput, ArrayUnit
+
+
+class ResultHFSSAdapter:
+    """返回标准验证结果的真实适配器最小替身。"""
+
+    mode = "real"
+
+    def run_validation(self, project_id, task_id, array_input):
+        """返回包含标准 result 的验证响应。"""
+
+        record = {"Phi[deg]": 0.0, "Theta[deg]": 0.0, "ECP_dB": -1.0, "ECP_Phase_deg": 2.0}
+        return {"status": "succeeded", "result": {"implementation": "hfss_com", "units": {"1": [record]}, "total_array": {"records": [record]}}}
+
+
+class EmptyRealHFSSAdapter(ResultHFSSAdapter):
+    """不返回方向图的真实适配器替身。"""
+
+    def run_validation(self, project_id, task_id, array_input):
+        """返回缺少 result 的响应，验证必须失败。"""
+
+        return {"status": "succeeded"}
 
 
 def wait_terminal(app: Application, task_id: str) -> dict:
@@ -49,8 +72,28 @@ def test_training_prediction_result_and_download(tmp_path: Path):
         result = app.get_results(evaluation["task_id"])
         assert result["mode"] == "prediction"
         assert len(result["total_array_result"]["prediction"]["records"]) == 16471
+        metadata = next(path for path in (tmp_path / "data").rglob("metadata.json"))
+        assert metadata.read_text(encoding="utf-8").find('"implementations": {') >= 0
+        assert '"stub"' in metadata.read_text(encoding="utf-8")
         archive, filename = app.download_results(evaluation["task_id"])
         assert archive[:2] == b"PK"
         assert filename.endswith(".zip")
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_real_hfss_validation_uses_adapter_result_and_fails_without_it(tmp_path: Path):
+    """验证真实 HFSS 返回结果被采用，缺少结果时不伪造验证通过。"""
+
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    array_input = ArrayInput(1, (ArrayUnit(1, 1, 1, 0.0, 0.0),))
+    try:
+        app.tasks.hfss = ResultHFSSAdapter()
+        result = app.tasks._run_validation("project_1", "task_1", array_input)
+        assert result["implementation"] == "hfss_com"
+        app.tasks.hfss = EmptyRealHFSSAdapter()
+        with pytest.raises(AppError, match="未返回标准方向图结果"):
+            app.tasks._run_validation("project_1", "task_2", array_input)
     finally:
         app.close()
