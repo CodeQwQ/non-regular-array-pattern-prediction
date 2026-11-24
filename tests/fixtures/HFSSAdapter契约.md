@@ -17,6 +17,8 @@
 - 方向图字段 `Phi[deg]`、`Theta[deg]`、`ECP_dB`、`ECP_Phase_deg`；
 - Theta/Phi 网格、单位、采样点数、输出文件和任务关联信息。
 
+训练 runner 成功时还必须在返回字典的 `model_path` 字段提供可访问的模型产物路径；真实 runner 缺少该字段或文件不可访问时，任务必须失败并保持模型不可用。开发 stub 可以省略该字段，但 stub 结果不构成真实训练证据。
+
 验证 runner 成功时还必须在返回字典的 `result` 字段提供标准结果对象：
 
 ```json

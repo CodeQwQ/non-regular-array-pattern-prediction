@@ -8,7 +8,7 @@
 |---|---|
 | 关联基线 | FR-001～FR-003、BR-005～BR-010、ALG-EQ-001、AC-003～AC-016 |
 | 输出 | `backend/data_io.py`、方向图/位置/特征/cn CSV fail-loud 测试 |
-| 当前状态 | 纯文件边界测试已完成并纳入全套 43 个本地测试；真实数据 hash 和服务器样本待建立 |
+| 当前状态 | 纯文件边界测试已完成并纳入全套 44 个本地测试；真实数据 hash 和服务器样本待建立 |
 
 ## 已完成
 
@@ -27,5 +27,5 @@
 
 ```text
 命令：py -3.12 -m pytest -m "not hfss_server" -q
-结果：43 passed, 1 deselected
+结果：44 passed, 1 deselected
 ```

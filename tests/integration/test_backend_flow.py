@@ -53,6 +53,29 @@ class FailedHFSSAdapter(ResultHFSSAdapter):
         return {"status": "failed", "result": {"units": {}, "total_array": {"records": []}}}
 
 
+class RealTrainingWithoutArtifactAdapter(FailedHFSSAdapter):
+    """返回成功状态但缺少模型产物的真实适配器替身。"""
+
+    mode = "real"
+
+    def run_training(self, project_id, task_id):
+        """返回缺少 model_path 的成功响应。"""
+
+        return {"status": "succeeded"}
+
+
+class RealTrainingWithArtifactAdapter(RealTrainingWithoutArtifactAdapter):
+    """返回可访问模型产物的真实适配器替身。"""
+
+    def __init__(self, model_path: Path):
+        self.model_path = model_path
+
+    def run_training(self, project_id, task_id):
+        """返回模型产物路径。"""
+
+        return {"status": "succeeded", "model_path": str(self.model_path)}
+
+
 def wait_terminal(app: Application, task_id: str) -> dict:
     """轮询任务至终态；参数为应用和任务 ID，返回终态字典。"""
 
@@ -138,6 +161,30 @@ def test_failed_hfss_training_does_not_mark_model_ready(tmp_path: Path):
         state = wait_terminal(app, training["task_id"])
         assert state["status"] == "failed"
         assert app.get_project(project["project_id"])["model_status"] == "failed"
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_real_hfss_training_requires_model_artifact(tmp_path: Path):
+    """验证真实训练没有模型文件时失败，有模型文件时才可用。"""
+
+    aedt = tmp_path / "real-training.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        app.tasks.hfss = RealTrainingWithoutArtifactAdapter()
+        missing_task, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, missing_task["task_id"])["status"] == "failed"
+        assert app.get_project(project["project_id"])["model_status"] == "failed"
+
+        model_path = tmp_path / "model.json"
+        model_path.write_text("model", encoding="utf-8")
+        app.tasks.hfss = RealTrainingWithArtifactAdapter(model_path)
+        successful_task, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, successful_task["task_id"])["status"] == "succeeded"
+        assert app.get_project(project["project_id"])["model_status"] == "ready"
     finally:
         app.close()
 

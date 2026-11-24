@@ -8,7 +8,7 @@
 |---|---|
 | 关联基线 | AGENTS.md、验证规范第 7/10 节、DOC-INDEX-001、API、UI |
 | 输出 | `scripts/check_project_controls.py`、`.github/workflows/quality.yml` |
-| 当前状态 | 本地项目控制、43 个 Python 测试和 Vite 构建均通过；HFSS 服务器门禁仍外置 |
+| 当前状态 | 本地项目控制、44 个 Python 测试和 Vite 构建均通过；HFSS 服务器门禁仍外置 |
 
 ## 当前命令
 

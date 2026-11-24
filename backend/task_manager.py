@@ -89,6 +89,7 @@ class TaskManager:
             self.store.update_task(task_id, current_stage="hfss_simulation", message="正在执行 HFSS 仿真与数据提取")
             training_response = self.hfss.run_training(project.project_id, task_id)
             self._require_adapter_success(training_response, "HFSS 训练")
+            self._require_training_artifact(training_response)
             self.store.update_task(task_id, current_stage="model_training", message="正在训练预测模型")
             version = f"model_{task_id}"
             self.store.update_project(project.project_id, model_status="ready", model_version=version, last_error=None)
@@ -241,6 +242,15 @@ class TaskManager:
                 500,
                 details=[{"field": "adapter_status", "reason": str(status)}],
             )
+
+    def _require_training_artifact(self, response: Any) -> None:
+        """要求真实训练返回可访问模型产物；stub 模式允许使用开发替身。"""
+
+        if getattr(self.hfss, "mode", "unknown") == "stub":
+            return
+        model_path = response.get("model_path") if isinstance(response, dict) else None
+        if not isinstance(model_path, (str, Path)) or not Path(model_path).is_file():
+            raise AppError("TASK_FAILED", "真实训练未返回可访问的模型产物", 500)
 
     @staticmethod
     def _normalise_result(result: dict[str, Any]) -> dict[str, Any]:
