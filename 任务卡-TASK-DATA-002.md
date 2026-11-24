@@ -16,8 +16,8 @@
 py -3.12 scripts/prepare_reference_data.py `
   --pattern E:\\data\\Average_ECP_270.csv `
   --positions E:\\data\\antenna_position_data.csv `
-  --features E:\\data\\dataset_single_element_6750.csv `
-  --feature-rows 270 `
+  --features E:\\data\\train_features_iter_1.csv `
+  --feature-rows 9 `
   --cn E:\\data\\dataset_single_element_6750.csv `
   --cn-samples 270 `
   --output artifacts/reference-data/manifest.json
