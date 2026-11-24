@@ -25,6 +25,8 @@ test('binds, trains, evaluates, displays and downloads a result', async ({ page 
   await page.getByRole('button', { name: '执行所选任务' }).click()
   await expect(page.getByText('succeeded')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('采样点：16471')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('img', { name: '总阵幅度图' })).toBeVisible()
+  await expect(page.getByRole('img', { name: '总阵相位图' })).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载完整结果' }).click()
   const download = await downloadPromise

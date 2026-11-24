@@ -32,8 +32,12 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .branches { display: flex; gap: 18px; color: #5d6b85; font-size: 13px; }
 .result-block { border-top: 1px solid #e8edf5; margin-top: 18px; padding-top: 14px; }
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+.chart-card { border: 1px solid #e3e9f3; border-radius: 12px; padding: 10px; background: #fbfcfe; }
+.chart-card h4 { margin: 0 0 6px; color: #53617b; font-size: 13px; }
+.chart-card svg { display: block; width: 100%; height: 180px; background: linear-gradient(#fff, #f4f7fb); border-radius: 8px; }
 pre { overflow: auto; padding: 12px; border-radius: 10px; background: #101a2b; color: #dbe7ff; font-size: 12px; }
 .notice, .error { margin: 14px 0 0; border-radius: 10px; padding: 11px 14px; }
 .notice { color: #1a6b42; background: #e7f7ee; }
 .error { color: #9b2c32; background: #ffedef; }
-@media (max-width: 760px) { .two-columns { grid-template-columns: 1fr; } .hero { display: block; } .connection { display: inline-block; margin-top: 14px; } }
+@media (max-width: 760px) { .two-columns, .charts { grid-template-columns: 1fr; } .hero { display: block; } .connection { display: inline-block; margin-top: 14px; } }

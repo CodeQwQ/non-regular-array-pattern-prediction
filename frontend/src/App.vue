@@ -25,6 +25,20 @@ const canPredict = computed(() => activeProject.value?.model_status === 'ready')
 const canValidate = computed(() => Boolean(activeProject.value))
 const terminal = computed(() => task.value && !['queued', 'running'].includes(task.value.status))
 
+function chartPoints(records, field) {
+  const cut = (records || []).filter((record) => Number(record['Theta[deg]']) === 0).sort((a, b) => Number(a['Phi[deg]']) - Number(b['Phi[deg]']))
+  if (!cut.length) return ''
+  const values = cut.map((record) => Number(record[field]))
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  return cut.map((record, index) => {
+    const x = (index / Math.max(cut.length - 1, 1)) * 560 + 20
+    const y = 180 - ((Number(record[field]) - min) / span) * 150
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  }).join(' ')
+}
+
 function showError(error) {
   errorMessage.value = error?.message || String(error)
 }
@@ -185,6 +199,20 @@ onUnmounted(() => pollTimer && clearInterval(pollTimer))
       <div v-for="(pattern, mode) in result.total_array_result" :key="mode" class="result-block">
         <h3>{{ mode }}</h3>
         <p>采样点：{{ pattern?.records?.length || 0 }}；字段：Phi、Theta、ECP 幅度、ECP 相位。</p>
+        <div class="charts" aria-label="总阵方向图">
+          <div class="chart-card">
+            <h4>总阵幅度 · Theta=0°</h4>
+            <svg viewBox="0 0 600 200" role="img" aria-label="总阵幅度图">
+              <polyline :points="chartPoints(pattern?.records, 'ECP_dB')" fill="none" stroke="#245bd6" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="chart-card">
+            <h4>总阵相位 · Theta=0°</h4>
+            <svg viewBox="0 0 600 200" role="img" aria-label="总阵相位图">
+              <polyline :points="chartPoints(pattern?.records, 'ECP_Phase_deg')" fill="none" stroke="#d65b45" stroke-width="2" />
+            </svg>
+          </div>
+        </div>
         <pre>{{ JSON.stringify(pattern?.records?.slice(0, 3), null, 2) }}</pre>
       </div>
     </section>
