@@ -42,3 +42,19 @@ test('rejects malformed JSON before creating an evaluation task', async ({ page 
   await page.getByRole('button', { name: '执行所选任务' }).click()
   await expect(page.getByText('阵列输入必须是合法 JSON')).toBeVisible()
 })
+
+test('shows the backend duplicate-position validation error', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
+  await page.getByRole('button', { name: '绑定工程' }).click()
+  await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
+  await page.getByLabel('固定 JSON 输入（JSON 是权威来源）').fill(JSON.stringify({
+    unit_count: 2,
+    units: [
+      { unit_id: 1, i: 1, j: 1, x: 0, y: 0 },
+      { unit_id: 2, i: 1, j: 2, x: 0, y: 0 },
+    ],
+  }))
+  await page.getByRole('button', { name: '执行所选任务' }).click()
+  await expect(page.getByText('阵列中存在重复位置')).toBeVisible()
+})
