@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -105,11 +106,15 @@ class TaskManager:
 
         branch_results: dict[str, dict[str, Any]] = {}
         artifacts: list[dict[str, Any]] = []
+        result_dir: Path | None = None
+        staging_dir: Path | None = None
+        result_persisted = False
         try:
             with self._lock:
                 result_dir = self._result_dir(project, task_id)
-                result_dir.mkdir(parents=True, exist_ok=False)
-            (result_dir / "input.json").write_text(json.dumps(array_input.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+                staging_dir = result_dir.with_name(f".{result_dir.name}.{task_id}.staging")
+                staging_dir.mkdir(parents=True, exist_ok=False)
+            (staging_dir / "input.json").write_text(json.dumps(array_input.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
             self.store.update_task(task_id, status="running", current_stage="prediction" if "prediction" in modes else "validation", message="评价任务执行中")
             for mode in modes:
                 self.store.update_task(task_id, **{f"{mode}_status": "running"}, current_stage=mode, message=f"正在执行 {mode} 分支")
@@ -118,8 +123,9 @@ class TaskManager:
                         raw_result = self._run_validation(project.project_id, task_id, array_input)
                     else:
                         raw_result = self.predictor.predict(array_input, mode)
-                    branch_results[mode] = self._normalise_result(raw_result)
-                    branch_artifacts = self._write_branch(result_dir, mode, branch_results[mode])
+                    branch_result = self._normalise_result(raw_result)
+                    branch_artifacts = self._write_branch(staging_dir, mode, branch_result)
+                    branch_results[mode] = branch_result
                     artifacts.extend(branch_artifacts)
                     self.store.update_task(task_id, **{f"{mode}_status": "succeeded"}, message=f"{mode} 分支完成")
                 except AppError as exc:
@@ -153,7 +159,7 @@ class TaskManager:
                 )
                 for mode in succeeded
             }
-            (result_dir / "metadata.json").write_text(
+            (staging_dir / "metadata.json").write_text(
                 json.dumps(
                     {
                         "task_id": task_id,
@@ -168,9 +174,27 @@ class TaskManager:
                 encoding="utf-8",
             )
             artifacts.insert(0, {"name": "metadata.json", "type": "metadata", "source": "common", "downloadable": True})
-            self.store.save_result(task_id, mode_name, payload, artifacts, str(result_dir))
-            self.store.update_task(task_id, status=status, current_stage="result_persist", result_available=bool(succeeded), message="结果已生成" if succeeded else "评价任务失败")
+            if succeeded:
+                assert result_dir is not None and staging_dir is not None
+                staging_dir.replace(result_dir)
+                self.store.save_result(
+                    task_id,
+                    mode_name,
+                    payload,
+                    artifacts,
+                    str(result_dir),
+                    status=status,
+                    current_stage="result_persist",
+                    message="结果已生成",
+                )
+                result_persisted = True
+            else:
+                self.store.update_task(task_id, status="failed", current_stage="result_persist", result_available=False, message="评价任务失败")
+                self._remove_result_path(staging_dir)
         except Exception as exc:  # pragma: no cover
+            if not result_persisted:
+                self._remove_result_path(staging_dir)
+                self._remove_result_path(result_dir)
             error = {"code": "INTERNAL_ERROR", "message": str(exc)}
             self.store.update_task(task_id, status="failed", current_stage="result_persist", message=str(exc), error=error)
 
@@ -238,6 +262,17 @@ class TaskManager:
             number += 1
             candidate = base / f"{date}_{number}"
         return candidate
+
+    @staticmethod
+    def _remove_result_path(path: Path | None) -> None:
+        """删除未提交结果目录；参数为临时或已发布目录，返回 None。"""
+
+        if path is None or not path.exists():
+            return
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
 
     @staticmethod
     def _write_branch(result_dir: Path, mode: str, result: dict[str, Any]) -> list[dict[str, Any]]:

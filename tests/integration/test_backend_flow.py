@@ -160,3 +160,64 @@ def test_evaluation_setup_failure_reaches_failed_state(tmp_path: Path, monkeypat
         assert state["result_available"] is False
     finally:
         app.close()
+
+
+@pytest.mark.integration
+def test_result_commit_failure_removes_published_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """数据库结果提交失败时，任务不可用且最终目录被回滚。"""
+
+    aedt = tmp_path / "result-commit-failure.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        training, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, training["task_id"])["status"] == "succeeded"
+
+        def fail_save_result(*_args, **_kwargs):
+            raise OSError("database unavailable")
+
+        monkeypatch.setattr(app.store, "save_result", fail_save_result)
+        evaluation, _ = app.create_evaluation(
+            project["project_id"],
+            {"input": {"unit_count": 1, "units": [{"unit_id": 1, "i": 1, "j": 1, "x": 0, "y": 0}]}, "modes": ["prediction"]},
+        )
+        state = wait_terminal(app, evaluation["task_id"])
+        assert state["status"] == "failed"
+        assert state["result_available"] is False
+        assert app.store.get_result(evaluation["task_id"]) is None
+        assert not list((tmp_path / "data").rglob("*.staging"))
+        assert not list((tmp_path / "data").rglob("metadata.json"))
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_partial_result_write_failure_removes_staging_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """分支文件写入失败时不发布部分结果目录。"""
+
+    aedt = tmp_path / "result-write-failure.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        training, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, training["task_id"])["status"] == "succeeded"
+
+        def fail_write(result_dir: Path, mode: str, result: dict):
+            (result_dir / mode).mkdir(parents=True, exist_ok=True)
+            raise OSError("disk full")
+
+        monkeypatch.setattr(app.tasks, "_write_branch", fail_write)
+        evaluation, _ = app.create_evaluation(
+            project["project_id"],
+            {"input": {"unit_count": 1, "units": [{"unit_id": 1, "i": 1, "j": 1, "x": 0, "y": 0}]}, "modes": ["prediction"]},
+        )
+        state = wait_terminal(app, evaluation["task_id"])
+        assert state["status"] == "failed"
+        assert state["result_available"] is False
+        assert app.store.get_result(evaluation["task_id"]) is None
+        assert not list((tmp_path / "data").rglob("*.staging"))
+        assert not list((tmp_path / "data").rglob("metadata.json"))
+    finally:
+        app.close()

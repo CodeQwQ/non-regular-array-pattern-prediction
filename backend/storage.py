@@ -196,13 +196,45 @@ class SQLiteStore:
             row = conn.execute("SELECT COUNT(*) AS count FROM tasks WHERE project_id = ?", (project_id,)).fetchone()
         return int(row["count"]) + 1
 
-    def save_result(self, task_id: str, mode: str, payload: dict[str, Any], artifacts: list[dict[str, Any]], result_dir: str) -> None:
-        """保存结果索引并标记任务可用；参数为任务、模式、结果、文件元数据和目录。"""
+    def save_result(
+        self,
+        task_id: str,
+        mode: str,
+        payload: dict[str, Any],
+        artifacts: list[dict[str, Any]],
+        result_dir: str,
+        *,
+        status: str | None = None,
+        current_stage: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        """原子保存结果索引并更新任务结果状态。
 
+        参数：task_id、mode、payload、artifacts 和已发布结果目录；可选的 status、current_stage、message
+        在同一 SQLite 事务内写入任务状态。调用方必须先将完整临时结果目录原子改名为 result_dir。
+        返回：无；任务不存在或结果目录不存在时抛出 KeyError 或 FileNotFoundError。
+        """
+
+        result_path = Path(result_dir)
+        if not result_path.is_dir():
+            raise FileNotFoundError(f"result directory does not exist: {result_dir}")
         now = utc_now()
+        task_assignments = ["result_available=1", "result_dir=?", "updated_at=?"]
+        task_values: list[Any] = [result_dir, now]
+        for key, value in (("status", status), ("current_stage", current_stage), ("message", message)):
+            if value is not None:
+                task_assignments.append(f"{key}=?")
+                task_values.append(value)
+        task_values.append(task_id)
         with self._session() as conn:
-            conn.execute("INSERT OR REPLACE INTO task_results(task_id,mode,payload_json,artifacts_json,created_at) VALUES (?,?,?,?,?)", (task_id, mode, json.dumps(payload, ensure_ascii=False), json.dumps(artifacts, ensure_ascii=False), now))
-            conn.execute("UPDATE tasks SET result_available=1,result_dir=?,updated_at=? WHERE task_id=?", (result_dir, now, task_id))
+            if conn.execute("SELECT 1 FROM tasks WHERE task_id = ?", (task_id,)).fetchone() is None:
+                raise KeyError(task_id)
+            conn.execute(
+                "INSERT OR REPLACE INTO task_results(task_id,mode,payload_json,artifacts_json,created_at) VALUES (?,?,?,?,?)",
+                (task_id, mode, json.dumps(payload, ensure_ascii=False), json.dumps(artifacts, ensure_ascii=False), now),
+            )
+            if conn.execute(f"UPDATE tasks SET {','.join(task_assignments)} WHERE task_id=?", task_values).rowcount != 1:
+                raise KeyError(task_id)
 
     def get_result(self, task_id: str) -> dict[str, Any] | None:
         """查询结果；参数为 task_id，返回结果字典或 None。"""
