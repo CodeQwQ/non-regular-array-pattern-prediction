@@ -38,6 +38,20 @@ class EmptyRealHFSSAdapter(ResultHFSSAdapter):
         return {"status": "succeeded"}
 
 
+class FailedHFSSAdapter(ResultHFSSAdapter):
+    """返回失败状态的 HFSS 适配器替身。"""
+
+    def run_training(self, project_id, task_id):
+        """返回失败训练状态。"""
+
+        return {"status": "failed", "message": "HFSS 训练失败"}
+
+    def run_validation(self, project_id, task_id, array_input):
+        """返回失败验证状态，即使携带结果也不得成功。"""
+
+        return {"status": "failed", "result": {"units": {}, "total_array": {"records": []}}}
+
+
 def wait_terminal(app: Application, task_id: str) -> dict:
     """轮询任务至终态；参数为应用和任务 ID，返回终态字典。"""
 
@@ -95,5 +109,54 @@ def test_real_hfss_validation_uses_adapter_result_and_fails_without_it(tmp_path:
         app.tasks.hfss = EmptyRealHFSSAdapter()
         with pytest.raises(AppError, match="未返回标准方向图结果"):
             app.tasks._run_validation("project_1", "task_2", array_input)
+        app.tasks.hfss = FailedHFSSAdapter()
+        with pytest.raises(AppError, match="未成功完成"):
+            app.tasks._run_validation("project_1", "task_3", array_input)
+        normalised = app.tasks._normalise_result({"implementation": "xgboost_reference", "units": {}, "total_array": {"records": [], "complex_field": [1 + 0j]}})
+        assert normalised["total_array"] == {"records": []}
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_failed_hfss_training_does_not_mark_model_ready(tmp_path: Path):
+    """验证 HFSS 训练返回 failed 时模型保持不可用。"""
+
+    aedt = tmp_path / "failed-training.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        app.tasks.hfss = FailedHFSSAdapter()
+        training, _ = app.start_training(project["project_id"])
+        state = wait_terminal(app, training["task_id"])
+        assert state["status"] == "failed"
+        assert app.get_project(project["project_id"])["model_status"] == "failed"
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_evaluation_setup_failure_reaches_failed_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """验证结果目录初始化失败不会让任务永久停留在 queued/running。"""
+
+    aedt = tmp_path / "failed-evaluation-setup.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        training, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, training["task_id"])["status"] == "succeeded"
+        monkeypatch.setattr(app.tasks, "_result_dir", lambda *_args: (_ for _ in ()).throw(OSError("disk unavailable")))
+        evaluation, _ = app.create_evaluation(
+            project["project_id"],
+            {
+                "input": {"unit_count": 1, "units": [{"unit_id": 1, "i": 1, "j": 1, "x": 0, "y": 0}]},
+                "modes": ["prediction"],
+            },
+        )
+        state = wait_terminal(app, evaluation["task_id"])
+        assert state["status"] == "failed"
+        assert state["result_available"] is False
     finally:
         app.close()

@@ -86,7 +86,8 @@ class TaskManager:
         try:
             self.store.update_task(task_id, status="running", current_stage="data_generation", message="正在生成训练数据")
             self.store.update_task(task_id, current_stage="hfss_simulation", message="正在执行 HFSS 仿真与数据提取")
-            self.hfss.run_training(project.project_id, task_id)
+            training_response = self.hfss.run_training(project.project_id, task_id)
+            self._require_adapter_success(training_response, "HFSS 训练")
             self.store.update_task(task_id, current_stage="model_training", message="正在训练预测模型")
             version = f"model_{task_id}"
             self.store.update_project(project.project_id, model_status="ready", model_version=version, last_error=None)
@@ -104,18 +105,20 @@ class TaskManager:
 
         branch_results: dict[str, dict[str, Any]] = {}
         artifacts: list[dict[str, Any]] = []
-        result_dir = self._result_dir(project, task_id)
-        result_dir.mkdir(parents=True, exist_ok=True)
-        (result_dir / "input.json").write_text(json.dumps(array_input.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
         try:
+            with self._lock:
+                result_dir = self._result_dir(project, task_id)
+                result_dir.mkdir(parents=True, exist_ok=False)
+            (result_dir / "input.json").write_text(json.dumps(array_input.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
             self.store.update_task(task_id, status="running", current_stage="prediction" if "prediction" in modes else "validation", message="评价任务执行中")
             for mode in modes:
                 self.store.update_task(task_id, **{f"{mode}_status": "running"}, current_stage=mode, message=f"正在执行 {mode} 分支")
                 try:
                     if mode == "validation":
-                        branch_results[mode] = self._run_validation(project.project_id, task_id, array_input)
+                        raw_result = self._run_validation(project.project_id, task_id, array_input)
                     else:
-                        branch_results[mode] = self.predictor.predict(array_input, mode)
+                        raw_result = self.predictor.predict(array_input, mode)
+                    branch_results[mode] = self._normalise_result(raw_result)
                     branch_artifacts = self._write_branch(result_dir, mode, branch_results[mode])
                     artifacts.extend(branch_artifacts)
                     self.store.update_task(task_id, **{f"{mode}_status": "succeeded"}, message=f"{mode} 分支完成")
@@ -134,7 +137,20 @@ class TaskManager:
             mode_name = "comparison" if set(succeeded) == {"prediction", "validation"} else (succeeded[0] if succeeded else modes[0])
             payload = {"task_id": task_id, "status": status, "mode": mode_name, "total_array_result": {mode: branch_results[mode].get("total_array") for mode in succeeded}, "files": artifacts}
             implementations = {
-                mode: branch_results[mode].get("implementation", getattr(self.predictor, "implementation", type(self.predictor).__name__))
+                mode: branch_results[mode].get(
+                    "implementation",
+                    "hfss_com" if mode == "validation" else getattr(self.predictor, "implementation", type(self.predictor).__name__),
+                )
+                for mode in succeeded
+            }
+            provenance = {
+                mode: (
+                    "predictor_stub_fallback"
+                    if mode == "validation" and branch_results[mode].get("implementation") == "stub_prediction_fallback"
+                    else "hfss_result"
+                    if mode == "validation"
+                    else "prediction_engine"
+                )
                 for mode in succeeded
             }
             (result_dir / "metadata.json").write_text(
@@ -142,6 +158,7 @@ class TaskManager:
                     {
                         "task_id": task_id,
                         "implementations": implementations,
+                        "provenance": provenance,
                         "hfss_mode": getattr(self.hfss, "mode", "unknown"),
                         "status": status,
                     },
@@ -166,20 +183,61 @@ class TaskManager:
         """
 
         adapter_response = self.hfss.run_validation(project_id, task_id, array_input.to_dict())
+        self._require_adapter_success(adapter_response, "HFSS 验证")
         if isinstance(adapter_response, dict):
             result = adapter_response.get("result")
             if isinstance(result, dict) and "units" in result and "total_array" in result:
+                result = dict(result)
+                result.setdefault("implementation", "hfss_com")
                 return result
         if getattr(self.hfss, "mode", "unknown") == "stub":
-            return self.predictor.predict(array_input, "validation")
+            result = dict(self.predictor.predict(array_input, "validation"))
+            result["implementation"] = "stub_prediction_fallback"
+            return result
         raise AppError("TASK_FAILED", "HFSS 验证未返回标准方向图结果", 500)
+
+    @staticmethod
+    def _require_adapter_success(response: Any, stage: str) -> None:
+        """要求 HFSS 适配器明确返回 succeeded；参数为响应和阶段名称，无返回值。"""
+
+        if not isinstance(response, dict) or response.get("status") != "succeeded":
+            status = response.get("status") if isinstance(response, dict) else "invalid_response"
+            message = response.get("message") if isinstance(response, dict) else None
+            raise AppError(
+                "TASK_FAILED",
+                message or f"{stage}未成功完成：{status}",
+                500,
+                details=[{"field": "adapter_status", "reason": str(status)}],
+            )
+
+    @staticmethod
+    def _normalise_result(result: dict[str, Any]) -> dict[str, Any]:
+        """裁剪为可持久化的标准结果；移除 reference 计算用的复数中间数组。"""
+
+        if not isinstance(result, dict) or not isinstance(result.get("total_array"), dict) or not isinstance(result.get("units"), dict):
+            raise AppError("TASK_FAILED", "算法结果缺少 units 或 total_array", 500)
+        total_array = result["total_array"]
+        if not isinstance(total_array.get("records"), list):
+            raise AppError("TASK_FAILED", "算法总阵结果缺少 records", 500)
+        normalised = dict(result)
+        normalised["total_array"] = {"records": total_array["records"]}
+        try:
+            json.dumps(normalised, ensure_ascii=False)
+        except TypeError as exc:
+            raise AppError("TASK_FAILED", f"算法结果不可序列化：{exc}", 500) from exc
+        return normalised
 
     def _result_dir(self, project: Project, task_id: str) -> Path:
         """计算项目任务结果目录；参数为项目和任务 ID，返回目录路径。"""
 
         number = self.store.next_project_task_number(project.project_id)
         date = datetime.now().strftime("%Y-%m-%d")
-        return self.settings.data_root / project.project_name / "output" / f"{date}_{number}"
+        base = self.settings.data_root / project.project_name / "output"
+        candidate = base / f"{date}_{number}"
+        while candidate.exists():
+            number += 1
+            candidate = base / f"{date}_{number}"
+        return candidate
 
     @staticmethod
     def _write_branch(result_dir: Path, mode: str, result: dict[str, Any]) -> list[dict[str, Any]]:

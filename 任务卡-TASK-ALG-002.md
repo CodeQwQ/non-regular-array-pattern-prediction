@@ -8,7 +8,7 @@
 |---|---|
 | 关联基线 | FR-003、ALG-EQ-001、项目总览、AC-014～AC-016 |
 | 输出 | `backend/reference_engine.py`、注入式链路测试 |
-| 当前状态 | 单方向图/单虚拟阵元链路已验证；完整 25 阵元、真实模型和真实方向图待接入 |
+| 当前状态 | ReferencePredictionEngine 已可通过 `ARRAYLAB_PREDICTOR_MODE=reference` 配置；真实模型、数据和方向图等价性仍待外部材料 |
 
 ## 已完成
 
@@ -21,5 +21,4 @@
 
 - 真实 25 虚拟阵元和 16471 点方向图黄金数据。
 - 真实 XGBoost 模型和训练数据接入。
-- 将 ReferencePredictionEngine 作为 TaskManager 的可配置生产实现。
 - 完整单元结果、总阵结果和服务器 HFSS 对照。
