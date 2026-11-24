@@ -6,8 +6,11 @@
 维护：真实算法接入前后同步 ALG-EQ-001 黄金夹具和任务卡。
 """
 
+import cmath
+
 import pytest
 
+from backend.algorithm_reference import DEFAULT_FREQUENCY_HZ, direction_cosines
 from backend.models import ArrayInput, ArrayUnit
 from backend.reference_engine import ReferencePredictionEngine
 
@@ -59,3 +62,26 @@ def test_reference_engine_supports_full_virtual_array_shape():
     output = engine.predict(ArrayInput(1, (ArrayUnit(1, 1, 1, 0.0, 0.0),)))
     assert len(output["units"]["1"]) == 2
     assert len(output["total_array"]["records"]) == 2
+
+
+@pytest.mark.unit
+def test_reference_engine_converts_mil_positions_to_meters_for_phase():
+    """验证总阵合成把 API mil 坐标转换为米，而不是按英寸换算。"""
+
+    pattern = [{"Phi[deg]": 0.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0}]
+    grid = {"m_flat": [1], "n_flat": [1], "dx": 0.005, "dy": 0.005, "center_comp": 0.0}
+    engine = ReferencePredictionEngine(FakeCnModel(), pattern, grid)
+    output = engine.predict(
+        ArrayInput(
+            2,
+            (
+                ArrayUnit(1, 1, 1, 0.0, 0.0),
+                ArrayUnit(2, 1, 2, 1.0, 0.0),
+            ),
+        )
+    )
+    u, v = direction_cosines(0.0, 0.0)
+    steer_u, steer_v = direction_cosines(20.0, 0.0)
+    beta = 2.0 * 3.141592653589793 * DEFAULT_FREQUENCY_HZ / 3.0e8
+    expected = 1.0 + cmath.exp(1j * beta * (0.0000254 * (u - steer_u)))
+    assert output["total_array"]["complex_field"][0] == pytest.approx(expected)

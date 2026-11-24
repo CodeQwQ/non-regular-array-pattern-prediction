@@ -78,6 +78,7 @@ class ReferencePredictionEngine:
                 amplitude_db, phase_deg = complex_to_pattern(ecp)
                 records.append({"Phi[deg]": float(record["Phi[deg]"]), "Theta[deg]": float(record["Theta[deg]"]), "ECP_dB": amplitude_db, "ECP_Phase_deg": phase_deg})
             unit_patterns.append(records)
-        positions_m = [(unit.x * 0.0254, unit.y * 0.0254) for unit in array_input.units]
+        # 输入坐标沿用 API 的 mil 单位；总阵合成函数要求米制坐标。
+        positions_m = [(unit.x * 0.0000254, unit.y * 0.0000254) for unit in array_input.units]
         total = synthesize_total_field(unit_patterns, positions_m)
         return {"implementation": self.implementation, "units": {str(index + 1): records for index, records in enumerate(unit_patterns)}, "total_array": total}
