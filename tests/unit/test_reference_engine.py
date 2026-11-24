@@ -65,8 +65,8 @@ def test_reference_engine_supports_full_virtual_array_shape():
 
 
 @pytest.mark.unit
-def test_reference_engine_converts_mil_positions_to_meters_for_phase():
-    """验证总阵合成把 API mil 坐标转换为米，而不是按英寸换算。"""
+def test_reference_engine_preserves_experiment_mil_position_phase_convention():
+    """验证总阵合成沿用实验和 data_io 的 mil→m 相位换算口径。"""
 
     pattern = [{"Phi[deg]": 0.0, "Theta[deg]": 0.0, "ECP_dB": 0.0, "ECP_Phase_deg": 0.0}]
     grid = {"m_flat": [1], "n_flat": [1], "dx": 0.005, "dy": 0.005, "center_comp": 0.0}
@@ -83,5 +83,5 @@ def test_reference_engine_converts_mil_positions_to_meters_for_phase():
     u, v = direction_cosines(0.0, 0.0)
     steer_u, steer_v = direction_cosines(20.0, 0.0)
     beta = 2.0 * 3.141592653589793 * DEFAULT_FREQUENCY_HZ / 3.0e8
-    expected = 1.0 + cmath.exp(1j * beta * (0.0000254 * (u - steer_u)))
+    expected = 1.0 + cmath.exp(1j * beta * (0.0254 * (u - steer_u)))
     assert output["total_array"]["complex_field"][0] == pytest.approx(expected)
