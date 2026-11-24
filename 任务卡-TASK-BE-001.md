@@ -40,7 +40,7 @@
 | 本地 unit/integration/contract 测试 | passed：9 tests |
 | 真实 HFSS 集成 | pending_external：服务器验收 |
 | 关键算法等价性 | pending_external：黄金夹具待建立 |
-| UI 真实 API E2E | pending：前端尚未实现 |
+| UI 真实 API E2E | 已由 TASK-UI-001 覆盖；服务器 HFSS E2E 待外部验收 |
 
 ## 证据
 
