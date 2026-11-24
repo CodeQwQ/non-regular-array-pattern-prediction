@@ -23,7 +23,7 @@
 - JSON/网页输入规则的服务端校验、重复位置和字段校验。
 - 开发 HFSSAdapter 和确定性算法替身，明确不代表真实 HFSS/最终算法通过。
 - 结果目录、JSON 结果、元数据和 ZIP 下载。
-- 单元、集成、契约测试和本地项目控制，当前全套 `44 passed, 1 deselected`。
+- 单元、集成、契约测试和本地项目控制，当前全套 `45 passed, 1 deselected`。
 - 真实 runner 必须返回可访问模型产物；缺少产物时任务失败，不会把项目标记为可预测。
 - 结果包元数据包含项目、模式、模型版本、输入快照、分支状态、错误和实现 provenance。
 - 真实 HFSS runner 结果契约和 provenance 元数据已接入；缺少真实结果时不会用预测替身冒充验证通过。
@@ -38,7 +38,7 @@
 | 门禁 | 状态 |
 |---|---|
 | Python AST / TOML / OpenAPI YAML | passed |
-| 本地 unit/integration/contract 测试 | passed：44 tests（另 1 个 hfss_server 用例已按标记排除） |
+| 本地 unit/integration/contract 测试 | passed：45 tests（另 1 个 hfss_server 用例已按标记排除） |
 | 真实 HFSS 集成 | pending_external：服务器验收 |
 | 关键算法等价性 | pending_external：黄金夹具待建立 |
 | UI 真实 API E2E | 已由 TASK-UI-001 覆盖；服务器 HFSS E2E 待外部验收 |
@@ -48,5 +48,5 @@
 ```text
 RUN-20261123-TASK-BE-001-local
 命令：py -3.12 -m pytest -m "not hfss_server" -q
-结果：44 passed, 1 deselected
+结果：45 passed, 1 deselected
 ```

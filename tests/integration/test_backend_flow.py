@@ -76,6 +76,21 @@ class RealTrainingWithArtifactAdapter(RealTrainingWithoutArtifactAdapter):
         return {"status": "succeeded", "model_path": str(self.model_path)}
 
 
+class PredictionOnlyEngine:
+    """只允许 prediction 分支成功的测试预测引擎。"""
+
+    implementation = "prediction_only_test"
+
+    def predict(self, array_input, branch="prediction"):
+        """prediction 返回 stub 结果，validation 注入失败。"""
+
+        if branch == "validation":
+            raise AppError("TASK_FAILED", "注入的验证分支失败", 500)
+        from backend.algorithm import StubPredictionEngine
+
+        return StubPredictionEngine().predict(array_input, branch)
+
+
 def wait_terminal(app: Application, task_id: str) -> dict:
     """轮询任务至终态；参数为应用和任务 ID，返回终态字典。"""
 
@@ -185,6 +200,41 @@ def test_real_hfss_training_requires_model_artifact(tmp_path: Path):
         successful_task, _ = app.start_training(project["project_id"])
         assert wait_terminal(app, successful_task["task_id"])["status"] == "succeeded"
         assert app.get_project(project["project_id"])["model_status"] == "ready"
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_dual_mode_partial_success_preserves_successful_branch(tmp_path: Path):
+    """验证双模式一个分支失败时保留成功结果并写入分支证据。"""
+
+    aedt = tmp_path / "partial-success.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        training, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, training["task_id"])["status"] == "succeeded"
+        app.tasks.predictor = PredictionOnlyEngine()
+        evaluation, _ = app.create_evaluation(
+            project["project_id"],
+            {
+                "input": {"unit_count": 1, "units": [{"unit_id": 1, "i": 1, "j": 1, "x": 0, "y": 0}]},
+                "modes": ["prediction", "validation"],
+            },
+        )
+        state = wait_terminal(app, evaluation["task_id"])
+        assert state["status"] == "partial_success"
+        assert state["prediction_status"] == "succeeded"
+        assert state["validation_status"] == "failed"
+        result = app.get_results(evaluation["task_id"])
+        assert result["mode"] == "prediction"
+        assert "prediction" in result["total_array_result"]
+        assert "validation" not in result["total_array_result"]
+        metadata = next(path for path in (tmp_path / "data").rglob("metadata.json"))
+        metadata_payload = json.loads(metadata.read_text(encoding="utf-8"))
+        assert metadata_payload["branch_status"] == {"prediction": "succeeded", "validation": "failed"}
+        assert "validation" in metadata_payload["branch_errors"]
     finally:
         app.close()
 
