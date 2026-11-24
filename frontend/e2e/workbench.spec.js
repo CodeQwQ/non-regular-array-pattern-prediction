@@ -32,3 +32,13 @@ test('binds, trains, evaluates, displays and downloads a result', async ({ page 
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/task_evaluation_.*_result\.zip/)
 })
+
+test('rejects malformed JSON before creating an evaluation task', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
+  await page.getByRole('button', { name: '绑定工程' }).click()
+  await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
+  await page.getByLabel('固定 JSON 输入（JSON 是权威来源）').fill('{invalid json')
+  await page.getByRole('button', { name: '执行所选任务' }).click()
+  await expect(page.getByText('阵列输入必须是合法 JSON')).toBeVisible()
+})

@@ -14,7 +14,7 @@
 ## 已完成
 
 - 已安装依赖并执行 `npm run build`。
-- 已执行 `npm run test:e2e`，验证真实 API 驱动的绑定、训练、评价、结果和下载流程。
+- 已执行 `npm run test:e2e`，验证真实 API 驱动的绑定、训练、评价、结果、下载和非法 JSON 阻断流程。
 - 已连接本地 Python 后端完成绑定、训练、预测、结果和 ZIP 下载的浏览器 E2E。
 - 总阵幅度/相位 SVG 图表已接入真实 `PatternRecord` 数据，并由 E2E 检查可见。
 
@@ -30,5 +30,5 @@
 命令：npm run build
 结果：Vite 7.3.8 production build passed
 命令：npm run test:e2e
-结果：1 passed（Playwright 本地 stub 后端）
+结果：2 passed（Playwright 本地 stub 后端，含非法 JSON 负面场景）
 ```
