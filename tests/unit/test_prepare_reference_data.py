@@ -3,7 +3,7 @@
 目的：验证真实数据准备 CLI 的 manifest 生成逻辑。
 输入：最小合法方向图 CSV 夹具和 argparse Namespace。
 输出：pytest manifest 测试结果。
-维护：数据 manifest 字段变化同步交付说明和 TASK-DATA-002。
+维护：数据 manifest 字段变化同步验证规范、验收场景清单和追踪矩阵。
 """
 
 import csv

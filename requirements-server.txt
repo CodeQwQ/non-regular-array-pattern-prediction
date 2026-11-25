@@ -1,0 +1,9 @@
+# 文件基本信息：requirements-server.txt
+# 用途：Windows/HFSS 服务器的后端运行依赖清单，供联网机器下载 wheel 后离线复制。
+# 输入：Python 3.12、Windows 11、HFSS 2021 服务器环境。
+# 输出：numpy、xgboost 和 pywin32 运行依赖。
+# 维护：依赖版本变化同步架构、服务器安装记录、目录索引和离线依赖包清单。
+
+numpy>=1.26,<3
+xgboost>=2.0,<4
+pywin32>=306

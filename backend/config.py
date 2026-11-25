@@ -21,15 +21,17 @@ class Settings:
     port: int
     db_path: Path
     data_root: Path
-    hfss_mode: str = "stub"
+    # 服务器默认走真实 COM。开发/契约测试必须显式传入 ``stub``。
+    hfss_mode: str = "real"
     max_hfss_workers: int = 4
-    predictor_mode: str = "stub"
+    predictor_mode: str = "reference"
     average_pattern_path: Path | None = None
     model_path: Path | None = None
     cleanup_enabled: bool = False
     retention_days: int = 90
     hfss_module_path: Path | None = None
     hfss_design_name: str = "number1"
+    hfss_runner_module_path: Path | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -46,14 +48,17 @@ class Settings:
             port=int(os.getenv("ARRAYLAB_PORT", "8000")),
             db_path=Path(os.getenv("ARRAYLAB_DB_PATH", str(project_root / "arraylab.sqlite3"))),
             data_root=Path(os.getenv("ARRAYLAB_DATA_ROOT", str(default_data))),
-            hfss_mode=os.getenv("ARRAYLAB_HFSS_MODE", "stub").lower(),
-            predictor_mode=os.getenv("ARRAYLAB_PREDICTOR_MODE", "stub").lower(),
+            # 正式服务默认真实模式。测试入口必须显式设置 ARRAYLAB_HFSS_MODE=stub
+            # 和 ARRAYLAB_PREDICTOR_MODE=stub，避免把替身误当成可交付服务。
+            hfss_mode=os.getenv("ARRAYLAB_HFSS_MODE", "real").lower(),
+            predictor_mode=os.getenv("ARRAYLAB_PREDICTOR_MODE", "reference").lower(),
             average_pattern_path=Path(os.environ["ARRAYLAB_AVERAGE_PATTERN_PATH"]) if os.getenv("ARRAYLAB_AVERAGE_PATTERN_PATH") else None,
             model_path=Path(os.environ["ARRAYLAB_MODEL_PATH"]) if os.getenv("ARRAYLAB_MODEL_PATH") else None,
             cleanup_enabled=os.getenv("ARRAYLAB_CLEANUP_ENABLED", "0") == "1",
             retention_days=int(os.getenv("ARRAYLAB_RETENTION_DAYS", "90")),
             hfss_module_path=Path(os.environ["ARRAYLAB_HFSS_MODULE_PATH"]) if os.getenv("ARRAYLAB_HFSS_MODULE_PATH") else None,
             hfss_design_name=os.getenv("ARRAYLAB_HFSS_DESIGN_NAME", "number1"),
+            hfss_runner_module_path=Path(os.environ["ARRAYLAB_HFSS_RUNNER_MODULE_PATH"]) if os.getenv("ARRAYLAB_HFSS_RUNNER_MODULE_PATH") else None,
             max_hfss_workers=min(4, max(1, int(os.getenv("ARRAYLAB_HFSS_WORKERS", "4")))),
         )
 

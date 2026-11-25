@@ -3,7 +3,7 @@
 目的：验证发布门禁拒绝 stub/缺失 manifest，并接受完整 passed 证据。
 输入：临时 reference/HFSS manifest 和环境变量。
 输出：pytest 发布门禁结果。
-维护：发布条件变化同步交付说明和 TASK-RELEASE-001。
+维护：发布条件变化同步验证规范、验收场景清单和追踪矩阵。
 """
 
 import json

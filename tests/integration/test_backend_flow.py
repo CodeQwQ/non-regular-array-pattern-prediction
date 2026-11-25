@@ -108,7 +108,7 @@ def test_training_prediction_result_and_download(tmp_path: Path):
 
     aedt = tmp_path / "demo.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project_response, project_status = app.create_project({"hfss_project_path": str(aedt)})
         assert project_status == 201
@@ -144,7 +144,7 @@ def test_training_prediction_result_and_download(tmp_path: Path):
 def test_real_hfss_validation_uses_adapter_result_and_fails_without_it(tmp_path: Path):
     """验证真实 HFSS 返回结果被采用，缺少结果时不伪造验证通过。"""
 
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     array_input = ArrayInput(1, (ArrayUnit(1, 1, 1, 0.0, 0.0),))
     try:
         app.tasks.hfss = ResultHFSSAdapter()
@@ -168,7 +168,7 @@ def test_failed_hfss_training_does_not_mark_model_ready(tmp_path: Path):
 
     aedt = tmp_path / "failed-training.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project, _ = app.create_project({"hfss_project_path": str(aedt)})
         app.tasks.hfss = FailedHFSSAdapter()
@@ -186,7 +186,7 @@ def test_real_hfss_training_requires_model_artifact(tmp_path: Path):
 
     aedt = tmp_path / "real-training.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project, _ = app.create_project({"hfss_project_path": str(aedt)})
         app.tasks.hfss = RealTrainingWithoutArtifactAdapter()
@@ -210,7 +210,7 @@ def test_dual_mode_partial_success_preserves_successful_branch(tmp_path: Path):
 
     aedt = tmp_path / "partial-success.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project, _ = app.create_project({"hfss_project_path": str(aedt)})
         training, _ = app.start_training(project["project_id"])
@@ -245,7 +245,7 @@ def test_evaluation_setup_failure_reaches_failed_state(tmp_path: Path, monkeypat
 
     aedt = tmp_path / "failed-evaluation-setup.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project, _ = app.create_project({"hfss_project_path": str(aedt)})
         training, _ = app.start_training(project["project_id"])
@@ -271,7 +271,7 @@ def test_result_commit_failure_removes_published_directory(tmp_path: Path, monke
 
     aedt = tmp_path / "result-commit-failure.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project, _ = app.create_project({"hfss_project_path": str(aedt)})
         training, _ = app.start_training(project["project_id"])
@@ -301,7 +301,7 @@ def test_partial_result_write_failure_removes_staging_directory(tmp_path: Path, 
 
     aedt = tmp_path / "result-write-failure.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     try:
         project, _ = app.create_project({"hfss_project_path": str(aedt)})
         training, _ = app.start_training(project["project_id"])

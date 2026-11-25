@@ -14,13 +14,13 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from .algorithm import StubPredictionEngine
+from .algorithm import NotReadyPredictionEngine, PredictionEngine, StubPredictionEngine
 from .data_io import load_pattern_csv
 from .config import Settings
 from .cleanup import start_cleanup_process
 from .errors import AppError
 from .hfss_adapter import StubHFSSAdapter, UnavailableHFSSAdapter
-from .hfss_real_adapter import RealHFSSAdapter
+from .hfss_real_adapter import RealHFSSAdapter, load_runners
 from .storage import SQLiteStore
 from .task_manager import TaskManager
 from .validation import normalise_array_input
@@ -39,11 +39,19 @@ class Application:
         if self.settings.hfss_mode == "stub":
             adapter = StubHFSSAdapter()
         elif self.settings.hfss_mode == "real":
-            adapter = RealHFSSAdapter(self.settings.hfss_module_path, self.settings.hfss_design_name)
+            training_runner, validation_runner = load_runners(self.settings.hfss_runner_module_path)
+            adapter = RealHFSSAdapter(
+                self.settings.hfss_module_path,
+                self.settings.hfss_design_name,
+                training_runner=training_runner,
+                validation_runner=validation_runner,
+                runner_context={"data_root": str(self.settings.data_root)},
+            )
         else:
             adapter = UnavailableHFSSAdapter()
         predictor = self._build_predictor()
-        self.tasks = TaskManager(self.settings, self.store, adapter, predictor)
+        predictor_loader = self._load_predictor_after_training if self.settings.predictor_mode == "reference" else None
+        self.tasks = TaskManager(self.settings, self.store, adapter, predictor, predictor_loader=predictor_loader)
 
     def _build_predictor(self):
         """根据配置构造 stub 或真实参考预测引擎；参数无，返回 PredictionEngine。"""
@@ -53,11 +61,37 @@ class Application:
         if self.settings.predictor_mode != "reference":
             raise AppError("INTERNAL_ERROR", f"未知预测模式：{self.settings.predictor_mode}", 500)
         if self.settings.average_pattern_path is None or self.settings.model_path is None:
-            raise AppError("MODEL_NOT_READY", "reference 模式必须配置平均 ECP 文件和模型文件", 409)
-        pattern = load_pattern_csv(self.settings.average_pattern_path)
+            return NotReadyPredictionEngine("模型尚未训练完成，请先绑定 HFSS 工程并启动训练")
+        if not self.settings.average_pattern_path.is_file() or not self.settings.model_path.is_file():
+            return NotReadyPredictionEngine("模型训练产物尚未生成，请先绑定 HFSS 工程并启动训练")
+        return self._load_reference_predictor(self.settings.model_path, self.settings.average_pattern_path)
+
+    @staticmethod
+    def _load_reference_predictor(model_path: Path, average_pattern_path: Path) -> PredictionEngine:
+        """从训练 runner 产物构造参考算法引擎。"""
+
+        pattern = load_pattern_csv(average_pattern_path)
         model = XGBoostCnModel()
-        model.load(self.settings.model_path)
+        model.load(model_path)
         return ReferencePredictionEngine(model, pattern)
+
+    def _load_predictor_after_training(self, response: dict[str, Any]) -> PredictionEngine:
+        """校验训练产物并返回可用于后续预测的真实引擎。
+
+        参数：response 为 HFSS 训练 runner 的成功响应，至少包含 model_path。
+        返回：ReferencePredictionEngine；缺少平均 ECP 或模型产物时抛出
+        MODEL_NOT_READY，训练任务不得进入 ready 状态。
+        """
+
+        model_value = response.get("model_path") if isinstance(response, dict) else None
+        pattern_value = response.get("average_pattern_path") if isinstance(response, dict) else None
+        model_path = Path(model_value) if isinstance(model_value, (str, Path)) else None
+        pattern_path = Path(pattern_value) if isinstance(pattern_value, (str, Path)) else self.settings.average_pattern_path
+        if model_path is None or not model_path.is_file():
+            raise AppError("MODEL_NOT_READY", "训练 runner 未返回可访问的模型文件", 500)
+        if pattern_path is None or not pattern_path.is_file():
+            raise AppError("MODEL_NOT_READY", "训练 runner 未返回可访问的平均 ECP 文件", 500)
+        return self._load_reference_predictor(model_path, pattern_path)
 
     def close(self) -> None:
         """关闭后台资源；无参数，返回 None。"""

@@ -3,7 +3,7 @@
 目的：验证服务器验收 manifest 的必填工程、RUN-ID 和 SHA-256 记录。
 输入：临时 .aedt 文件和环境变量 monkeypatch。
 输出：pytest manifest 测试结果。
-维护：服务器证据字段变化同步交付说明和 TASK-HFSS-001。
+维护：服务器证据字段变化同步验证规范、验收场景清单和服务器验收记录。
 """
 
 import hashlib

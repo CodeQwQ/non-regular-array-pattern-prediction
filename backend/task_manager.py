@@ -1,6 +1,6 @@
 """文件基本信息：backend/task_manager.py
 
-目的：编排训练、预测、验证和双模式后台任务，维护主任务与分支状态。
+目的：编排训练、预测、验证和双模式后台任务，校验训练产物并安装可用模型，维护主任务与分支状态。
 输入：SQLiteStore、HFSSAdapter、PredictionEngine、项目和规范化输入。
 输出：立即返回的 queued Task，后台更新状态、结果文件和错误证据。
 维护：状态转换变化必须同步 api.md、openapi.yaml、验证规范和测试。
@@ -14,7 +14,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .algorithm import PredictionEngine
 from .config import Settings
@@ -27,11 +27,19 @@ from .storage import SQLiteStore
 class TaskManager:
     """后台任务编排器；线程池容量由 Settings 限制为最多 4。"""
 
-    def __init__(self, settings: Settings, store: SQLiteStore, hfss: HFSSAdapter, predictor: PredictionEngine) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: SQLiteStore,
+        hfss: HFSSAdapter,
+        predictor: PredictionEngine,
+        predictor_loader: Callable[[dict[str, Any]], PredictionEngine] | None = None,
+    ) -> None:
         self.settings = settings
         self.store = store
         self.hfss = hfss
         self.predictor = predictor
+        self.predictor_loader = predictor_loader
         self.executor = ThreadPoolExecutor(max_workers=settings.max_hfss_workers, thread_name_prefix="arraylab-task")
         self._lock = threading.Lock()
 
@@ -91,6 +99,10 @@ class TaskManager:
             self._require_adapter_success(training_response, "HFSS 训练")
             self._require_training_artifact(training_response)
             self.store.update_task(task_id, current_stage="model_training", message="正在训练预测模型")
+            if self.predictor_loader is not None:
+                # 真实训练必须在模型文件和平均方向图均可访问后才能宣布 ready。
+                # loader 失败会进入统一失败路径，禁止把数据库状态写成 ready。
+                self.predictor = self.predictor_loader(training_response)
             version = f"model_{task_id}"
             self.store.update_project(project.project_id, model_status="ready", model_version=version, last_error=None)
             self.store.update_task(task_id, status="succeeded", current_stage="model_training", message="模型训练完成，可执行评价")

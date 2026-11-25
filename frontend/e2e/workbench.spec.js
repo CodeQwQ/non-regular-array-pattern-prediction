@@ -2,7 +2,7 @@
 // 目的：使用真实浏览器验证 Vue 工作台与 Python 后端 stub 的关键流程。
 // 输入：临时 .aedt 路径、合法阵列 JSON、prediction 模式。
 // 输出：Playwright 页面断言、任务状态和下载证据。
-// 维护：页面/API/验收场景变化时同步 frontend/e2e 索引和 TASK-UI-001。
+// 维护：页面/API/验收场景变化时同步 frontend/e2e 索引和验收场景清单。
 
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs'

@@ -3,7 +3,7 @@
 目的：在真实模型训练前校验方向图、位置表、特征和 cn 数据，并生成 manifest。
 输入：命令行指定的 CSV 文件和样本规模。
 输出：JSON 数据 manifest，包含文件 hash、行数和字段信息。
-维护：数据规则变化同步 data_io、黄金夹具、任务卡和交付说明。
+维护：数据规则变化同步 data_io、黄金夹具和验收场景清单。
 """
 
 from __future__ import annotations
@@ -11,7 +11,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.data_io import load_cn_dataset, load_feature_csv, load_pattern_csv, load_position_table
 

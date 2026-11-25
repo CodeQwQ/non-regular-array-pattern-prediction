@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from .errors import AppError
 from .models import ArrayInput
 
 
@@ -44,3 +45,26 @@ class StubPredictionEngine:
                 })
         units = {str(unit.unit_id): list(total) for unit in array_input.units}
         return {"implementation": self.implementation, "total_array": {"records": total}, "units": units}
+
+
+class NotReadyPredictionEngine:
+    """生产服务在首次训练完成前使用的占位引擎。
+
+    服务可以在没有预置模型时启动，绑定工程后由训练任务安装真实引擎。
+    该对象拒绝预测，避免把启动占位状态误报成算法结果。
+    """
+
+    implementation = "reference_not_ready"
+
+    def __init__(self, reason: str = "模型尚未训练完成") -> None:
+        self.reason = reason
+
+    def predict(self, array_input: ArrayInput, branch: str = "prediction") -> dict[str, Any]:
+        """拒绝尚未完成模型加载的预测请求。
+
+        参数：array_input 为规范化阵列输入；branch 为请求分支。
+        返回：不会返回结果；始终抛出 MODEL_NOT_READY。
+        """
+
+        del array_input, branch
+        raise AppError("MODEL_NOT_READY", self.reason, 409)

@@ -3,7 +3,7 @@
 目的：阻止 stub、缺少真实数据或未完成 HFSS 验收的状态被标记为可发布。
 输入：环境变量 ARRAYLAB_PREDICTOR_MODE、ARRAYLAB_REFERENCE_MANIFEST、ARRAYLAB_HFSS_RUN_MANIFEST、ARRAYLAB_HFSS_ACCEPTANCE_STATUS。
 输出：发布门禁检查结果；不满足时非零退出。
-维护：发布条件变化同步验证规范、交付说明、TASK-RELEASE-001 和追踪矩阵。
+维护：发布条件变化同步验证规范、验收场景清单和追踪矩阵。
 """
 
 from __future__ import annotations

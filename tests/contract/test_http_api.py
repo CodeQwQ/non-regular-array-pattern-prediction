@@ -25,7 +25,7 @@ def test_http_project_binding_and_invalid_input(tmp_path: Path):
 
     aedt = tmp_path / "api-demo.aedt"
     aedt.write_text("stub", encoding="utf-8")
-    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4))
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
     server = create_server(app, "127.0.0.1", 0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

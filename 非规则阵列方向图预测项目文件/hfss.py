@@ -13,7 +13,7 @@
 #          导出与遗留对象清理等自动化操作，是全部训练/测试数据采集的底层接口。
 # 类/函数清单：
 #   class HFSS —— HFSS 自动化操作封装类
-#     __init__               连接 HFSS 并激活指定项目/设计/3D建模器
+#     __init__               连接 HFSS 并激活指定项目/设计/3D建模器，可接收任务隔离输出目录
 #     move                   将天线单元沿 x/y 方向平移指定距离(mil)
 #     move_xyz               在指定位置创建相对坐标系 RelativeCS（用于定位单元）
 #     Box60                  创建金属地小板 Box60（X/Y 位置与尺寸由传入表达式
@@ -46,6 +46,13 @@
 from win32com import client
 import os
 import time
+
+
+def _output_root():
+    """返回 HFSS 导出目录；未配置时保留实验脚本默认目录。"""
+
+    root = os.getenv("ARRAYLAB_HFSS_OUTPUT_ROOT", r"E:\c50066007\pythonML_mianzhen_random")
+    return root if root.endswith(("/", "\\")) else root + os.sep
 
 
 def _validate_exported_csv(file_path, expected_column, min_data_rows=16000):
@@ -98,7 +105,11 @@ def _validate_exported_csv(file_path, expected_column, min_data_rows=16000):
 
 
 class HFSS:
-    def __init__(self, project_path=r"E:\c50066007\MiRC_Slot_fed_filtenna_throughvias.aedt", design_name="number1"):
+    def __init__(self, project_path=r"E:\c50066007\MiRC_Slot_fed_filtenna_throughvias.aedt", design_name="number1", output_root=None):
+
+        self.output_root = output_root or _output_root()
+        if not self.output_root.endswith(("/", "\\")):
+            self.output_root += os.sep
 
         # ==================== 1. 检查工程路径 ====================
         project_path = os.path.abspath(project_path)
@@ -578,7 +589,7 @@ class HFSS:
     #     rad_field_module = self.oDesign.GetModule("RadField")
     #     self.oModule = self.oDesign.GetModule("ReportSetup")
     #
-    #     base_path = "E:/c50066007/pythonML_mianzhen_random/"
+    #     base_path = _output_root()
     #
     #     for idx in range(n):
     #         # ===== 动态构造核心命名参数（和你给的代码完全一样） =====
@@ -733,7 +744,7 @@ class HFSS:
             rad_field_module.GetSetupNames("Infinite Sphere") or []
         )
 
-        base_path = "E:/c50066007/pythonML_mianzhen_random/"
+        base_path = self.output_root
 
         for idx in range(n):
             # ===== 动态构造核心命名参数 =====
@@ -865,7 +876,7 @@ class HFSS:
             rad_field_module.GetSetupNames("Infinite Sphere") or []
         )
 
-        base_path = "E:/c50066007/pythonML_mianzhen_random/"
+        base_path = self.output_root
 
         for idx in range(n):
             # ===== 动态构造核心命名参数 =====
@@ -1002,7 +1013,7 @@ class HFSS:
         rad_field_module = self.oDesign.GetModule("RadField")
         self.oModule = self.oDesign.GetModule("ReportSetup")
 
-        base_path = "E:/c50066007/pythonML_mianzhen_random/"
+        base_path = self.output_root
 
         # 1. 球先删后建：不查存在性直接删（不存在时 COM 报错静默忽略），
         #    杜绝旧定义（如 1° 步长）静默沿用
@@ -1148,7 +1159,7 @@ class HFSS:
     #     self.oModule = self.oDesign.GetModule("ReportSetup")
     #
     #     # 定义基础路径（和模板保持一致）
-    #     base_path = "E:/c50066007/pythonML_mianzhen_random/"
+    #     base_path = _output_root()
     #
     #     # 循环处理1到n的模式（动态范围）
     #     for i in range(0, n):  # 范围1到n，支持灵活数量
@@ -1272,7 +1283,7 @@ class HFSS:
         rad_field_module = self.oDesign.GetModule("RadField")
         self.oModule = self.oDesign.GetModule("ReportSetup")
 
-        base_path = "E:/c50066007/pythonML_mianzhen_random/"
+        base_path = self.output_root
 
         # ==========================================================
         # 1. 查询 HFSS 当前已经存在的 Infinite Sphere
@@ -1492,7 +1503,7 @@ class HFSS:
         rad_field_module = self.oDesign.GetModule("RadField")
         self.oModule = self.oDesign.GetModule("ReportSetup")
 
-        base_path = "E:/c50066007/pythonML_mianzhen_random/"
+        base_path = self.output_root
 
         # ==========================================================
         # 1. 查询 HFSS 当前已经存在的 Infinite Sphere
@@ -1677,7 +1688,7 @@ class HFSS:
     #     self.oModule = self.oDesign.GetModule("ReportSetup")
     #
     #     # 2. 定义基础路径（和模板保持一致）
-    #     base_path = "E:/c50066007/pythonML_mianzhen_random/"
+    #     base_path = _output_root()
     #
     #     # 3. 循环处理n个模式（索引0到n-1，对应1到n的命名）
     #     for idx in range(n):  # 0到n-1，共n个元素
@@ -1834,7 +1845,7 @@ class HFSS:
         # 动态生成报告名称：Directivity Plot {sphere_number}_{n}
         report_name = f"Directivity Plot {sphere_number}_{n}"
         # 动态生成导出文件路径：all_directivity_{n}.csv
-        export_path = f"E:/c50066007/pythonML_mianzhen_random/test_2_directivity_{n}.csv"
+        export_path = f"{self.output_root}test_2_directivity_{n}.csv"
         self.oModule.CreateReport(report_name, "Far Fields", "Rectangular Plot", "Setup1 : LastAdaptive",
                              [
                                  "Context:="    , sphere_name

@@ -3,7 +3,7 @@
 目的：生成服务器 HFSS 验收的可追踪 manifest，记录环境、commit、输入 hash 和证据路径。
 输入：环境变量 ARRAYLAB_HFSS_PROJECT_PATH、可选模型/数据路径和 RUN_ID。
 输出：artifacts/acceptance/<RUN-ID>/manifest.json。
-维护：manifest 字段变化同步 TASK-HFSS-001、交付说明和服务器验收记录模板。
+维护：manifest 字段变化同步验证规范、验收场景清单和服务器验收记录。
 """
 
 from __future__ import annotations
