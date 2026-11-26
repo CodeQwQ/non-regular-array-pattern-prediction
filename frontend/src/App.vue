@@ -90,6 +90,13 @@ function chartPoints(records, field) {
   }).join(' ')
 }
 
+function comparisonChartPoints(records, field) {
+  return {
+    prediction: chartPoints(records?.prediction?.records, field),
+    validation: chartPoints(records?.validation?.records, field),
+  }
+}
+
 function showError(error) {
   errorMessage.value = error?.message || String(error)
 }
@@ -266,6 +273,26 @@ onUnmounted(() => pollTimer && clearInterval(pollTimer))
     <section v-if="result" class="card">
       <div class="row-between"><h2>总阵结果</h2><button class="secondary" @click="saveTaskDownload(task.task_id)">下载完整结果</button></div>
       <p class="meta">模式：{{ result.mode }} · 结果文件：{{ result.files?.length || 0 }} 个</p>
+      <div v-if="result.mode === 'comparison'" class="comparison-card">
+        <h3>预测与验证对比</h3>
+        <p class="meta">双模式结果使用同一输入。误差指标：{{ JSON.stringify(result.comparison?.metrics || {}) }}</p>
+        <div class="charts">
+          <div class="chart-card">
+            <h4>总阵幅度对比 · Theta=0°</h4>
+            <svg viewBox="0 0 600 200" role="img" aria-label="预测验证总阵幅度对比图">
+              <polyline :points="comparisonChartPoints(result.total_array_result, 'ECP_dB').prediction" fill="none" stroke="#245bd6" stroke-width="2" />
+              <polyline :points="comparisonChartPoints(result.total_array_result, 'ECP_dB').validation" fill="none" stroke="#d65b45" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="chart-card">
+            <h4>总阵相位对比 · Theta=0°</h4>
+            <svg viewBox="0 0 600 200" role="img" aria-label="预测验证总阵相位对比图">
+              <polyline :points="comparisonChartPoints(result.total_array_result, 'ECP_Phase_deg').prediction" fill="none" stroke="#245bd6" stroke-width="2" />
+              <polyline :points="comparisonChartPoints(result.total_array_result, 'ECP_Phase_deg').validation" fill="none" stroke="#d65b45" stroke-width="2" />
+            </svg>
+          </div>
+        </div>
+      </div>
       <div v-for="(pattern, mode) in result.total_array_result" :key="mode" class="result-block">
         <h3>{{ mode }}</h3>
         <p>采样点：{{ pattern?.records?.length || 0 }}；字段：Phi、Theta、ECP 幅度、ECP 相位。</p>

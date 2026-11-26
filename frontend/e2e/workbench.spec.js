@@ -45,6 +45,20 @@ test('submits the manual position table when JSON is absent', async ({ page }) =
   await expect(page.getByText('succeeded')).toBeVisible({ timeout: 10_000 })
 })
 
+test('shows overlaid prediction and validation lines in dual mode', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
+  await page.getByRole('button', { name: '绑定工程' }).click()
+  await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
+  await page.getByRole('button', { name: '开始训练' }).click()
+  await expect(page.getByText('模型：ready')).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: '验证' }).click()
+  await page.getByLabel('JSON 文本（与手工表同时存在时优先）').fill(JSON.stringify({ unit_count: 1, units: [{ unit_id: 1, i: 1, j: 1, x: 0, y: 0 }] }))
+  await page.getByRole('button', { name: '执行所选任务' }).click()
+  await expect(page.getByText('预测与验证对比')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('img', { name: '预测验证总阵幅度对比图' })).toBeVisible()
+})
+
 test('rejects malformed JSON before creating an evaluation task', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
