@@ -1,6 +1,6 @@
 <!-- 文件基本信息：frontend/src/App.vue
 用途：真实 API 驱动的项目绑定、训练、评价、结果查看和下载页面。
-输入：用户填写的 HFSS 绝对路径、阵列 JSON 和模式选择；后端任务/结果响应。
+输入：用户填写的 HFSS 绝对路径、阵列手工位置、JSON 文件或 JSON 文本和模式选择；后端任务/结果响应。
 输出：项目状态、任务状态、总阵结果数据预览和下载动作。
 维护：修改页面状态时同步 UI 验收场景、API client、目录索引和 E2E 测试。
 -->
@@ -12,6 +12,8 @@ const projects = ref([])
 const activeProjectId = ref('')
 const hfssPath = ref('')
 const inputText = ref('')
+const manualUnitCount = ref(1)
+const manualUnits = ref([createManualUnit(1)])
 const modes = ref(['prediction'])
 const task = ref(null)
 const result = ref(null)
@@ -24,6 +26,55 @@ const activeProject = computed(() => projects.value.find((item) => item.project_
 const canPredict = computed(() => activeProject.value?.model_status === 'ready')
 const canValidate = computed(() => Boolean(activeProject.value))
 const terminal = computed(() => task.value && !['queued', 'running'].includes(task.value.status))
+
+function createManualUnit(unitId) {
+  return {
+    unit_id: unitId,
+    i: Math.floor((unitId - 1) / 5) + 1,
+    j: ((unitId - 1) % 5) + 1,
+    x: unitId === 1 ? 0 : '',
+    y: unitId === 1 ? 0 : '',
+  }
+}
+
+function resizeManualUnits() {
+  const count = Math.max(1, Math.min(100, Number(manualUnitCount.value) || 1))
+  manualUnitCount.value = count
+  const previous = manualUnits.value
+  manualUnits.value = Array.from({ length: count }, (_, index) => ({
+    ...createManualUnit(index + 1),
+    ...(previous[index] || {}),
+    unit_id: index + 1,
+    i: Math.floor(index / 5) + 1,
+    j: (index % 5) + 1,
+  }))
+}
+
+function manualInput() {
+  const units = manualUnits.value.map((unit) => {
+    const x = Number(unit.x)
+    const y = Number(unit.y)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('请完整填写手工位置表中的 x、y 坐标')
+    return { ...unit, x, y }
+  })
+  return { unit_count: units.length, units }
+}
+
+async function importJsonFile(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  try {
+    const text = await file.text()
+    JSON.parse(text)
+    inputText.value = text
+    notice.value = `已导入 ${file.name}。JSON 输入优先于手工位置表。`
+    errorMessage.value = ''
+  } catch {
+    showError(new Error('JSON 文件无法解析'))
+  } finally {
+    event.target.value = ''
+  }
+}
 
 function chartPoints(records, field) {
   const cut = (records || []).filter((record) => Number(record['Theta[deg]']) === 0).sort((a, b) => Number(a['Phi[deg]']) - Number(b['Phi[deg]']))
@@ -97,9 +148,9 @@ async function evaluate() {
   if (!modes.value.length) return showError(new Error('至少选择预测或验证一种模式'))
   let input
   try {
-    input = JSON.parse(inputText.value)
-  } catch {
-    return showError(new Error('阵列输入必须是合法 JSON'))
+    input = inputText.value.trim() ? JSON.parse(inputText.value) : manualInput()
+  } catch (error) {
+    return showError(error instanceof SyntaxError ? new Error('阵列输入必须是合法 JSON') : error)
   }
   busy.value = true
   errorMessage.value = ''
@@ -171,8 +222,27 @@ onUnmounted(() => pollTimer && clearInterval(pollTimer))
 
       <article class="card">
         <h2>阵列输入与评价</h2>
-        <label for="array-input">固定 JSON 输入（JSON 是权威来源）</label>
-        <textarea id="array-input" v-model="inputText" rows="11" placeholder='{"unit_count":1,"units":[{"unit_id":1,"i":1,"j":1,"x":0,"y":0}]}' />
+        <label for="manual-unit-count">网页位置表</label>
+        <div class="manual-toolbar">
+          <input id="manual-unit-count" v-model.number="manualUnitCount" type="number" min="1" max="100" />
+          <button class="secondary" type="button" @click="resizeManualUnits">生成位置表</button>
+        </div>
+        <div class="manual-table-wrap">
+          <table class="manual-table">
+            <thead><tr><th>unit_id</th><th>i</th><th>j</th><th>x（mil）</th><th>y（mil）</th></tr></thead>
+            <tbody>
+              <tr v-for="unit in manualUnits" :key="unit.unit_id">
+                <td>{{ unit.unit_id }}</td><td>{{ unit.i }}</td><td>{{ unit.j }}</td>
+                <td><input v-model="unit.x" :aria-label="`第 ${unit.unit_id} 个单元 x 坐标`" type="number" step="any" /></td>
+                <td><input v-model="unit.y" :aria-label="`第 ${unit.unit_id} 个单元 y 坐标`" type="number" step="any" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <label for="position-json-file">导入 JSON 文件</label>
+        <input id="position-json-file" type="file" accept=".json,application/json" @change="importJsonFile" />
+        <label for="array-input">JSON 文本（与手工表同时存在时优先）</label>
+        <textarea id="array-input" v-model="inputText" rows="7" placeholder='{"unit_count":1,"units":[{"unit_id":1,"i":1,"j":1,"x":0,"y":0}]}' />
         <div class="modes">
           <button :class="{ selected: modes.includes('prediction') }" @click="toggleMode('prediction')">预测</button>
           <button :class="{ selected: modes.includes('validation') }" @click="toggleMode('validation')">验证</button>

@@ -346,6 +346,7 @@ GET /api/v1/tasks/{task_id}/download
 - 包含总阵结果；
 - 包含预测、验证和对比数据；
 - 包含必要的输入和任务元数据。
+- `files` 至少包含执行分支的 JSON 数据和 SVG 图；双模式成功时还包含 `comparison` 目录下的对比 SVG 与误差指标 JSON。
 
 第一版不提供按结果类型分别下载的接口。
 

@@ -9,10 +9,13 @@
 from __future__ import annotations
 
 import json
+import logging
+import math
 import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 from typing import Any, Callable
 
@@ -42,6 +45,7 @@ class TaskManager:
         self.predictor_loader = predictor_loader
         self.executor = ThreadPoolExecutor(max_workers=settings.max_hfss_workers, thread_name_prefix="arraylab-task")
         self._lock = threading.Lock()
+        self.logger = logging.getLogger("arraylab")
 
     def close(self) -> None:
         """关闭后台线程池；无参数，返回 None。"""
@@ -107,9 +111,11 @@ class TaskManager:
             self.store.update_project(project.project_id, model_status="ready", model_version=version, last_error=None)
             self.store.update_task(task_id, status="succeeded", current_stage="model_training", message="模型训练完成，可执行评价")
         except AppError as exc:
+            self.logger.error("training failed project_id=%s task_id=%s code=%s message=%s", project.project_id, task_id, exc.code, exc.message)
             self.store.update_project(project.project_id, model_status="failed", last_error=exc.to_dict())
             self.store.update_task(task_id, status="failed", current_stage="model_training", message=exc.message, error=exc.to_dict())
         except Exception as exc:  # pragma: no cover - 防止后台线程吞掉未知错误
+            self.logger.exception("unexpected training failure project_id=%s task_id=%s", project.project_id, task_id)
             error = {"code": "INTERNAL_ERROR", "message": str(exc)}
             self.store.update_project(project.project_id, model_status="failed", last_error=error)
             self.store.update_task(task_id, status="failed", current_stage="model_training", message=str(exc), error=error)
@@ -143,9 +149,11 @@ class TaskManager:
                     artifacts.extend(branch_artifacts)
                     self.store.update_task(task_id, **{f"{mode}_status": "succeeded"}, message=f"{mode} 分支完成")
                 except AppError as exc:
+                    self.logger.error("evaluation branch failed project_id=%s task_id=%s mode=%s code=%s message=%s", project.project_id, task_id, mode, exc.code, exc.message)
                     branch_errors[mode] = exc.to_dict()
                     self.store.update_task(task_id, **{f"{mode}_status": "failed"}, message=exc.message, error=exc.to_dict())
                 except Exception as exc:  # pragma: no cover
+                    self.logger.exception("unexpected evaluation branch failure project_id=%s task_id=%s mode=%s", project.project_id, task_id, mode)
                     branch_errors[mode] = {"error": {"code": "TASK_FAILED", "message": str(exc)}}
                     self.store.update_task(task_id, **{f"{mode}_status": "failed"}, message=str(exc), error=branch_errors[mode])
 
@@ -157,7 +165,17 @@ class TaskManager:
             else:
                 status = "failed"
             mode_name = "comparison" if set(succeeded) == {"prediction", "validation"} else (succeeded[0] if succeeded else modes[0])
+            comparison = None
+            if set(succeeded) == {"prediction", "validation"}:
+                comparison, comparison_artifacts = self._write_comparison(
+                    staging_dir,
+                    branch_results["prediction"]["total_array"],
+                    branch_results["validation"]["total_array"],
+                )
+                artifacts.extend(comparison_artifacts)
             payload = {"task_id": task_id, "status": status, "mode": mode_name, "total_array_result": {mode: branch_results[mode].get("total_array") for mode in succeeded}, "files": artifacts}
+            if comparison is not None:
+                payload["comparison"] = comparison
             implementations = {
                 mode: branch_results[mode].get(
                     "implementation",
@@ -213,6 +231,7 @@ class TaskManager:
                 self.store.update_task(task_id, status="failed", current_stage="result_persist", result_available=False, message="评价任务失败")
                 self._remove_result_path(staging_dir)
         except Exception as exc:  # pragma: no cover
+            self.logger.exception("unexpected evaluation failure project_id=%s task_id=%s", project.project_id, task_id)
             if not result_persisted:
                 self._remove_result_path(staging_dir)
                 self._remove_result_path(result_dir)
@@ -306,13 +325,75 @@ class TaskManager:
 
     @staticmethod
     def _write_branch(result_dir: Path, mode: str, result: dict[str, Any]) -> list[dict[str, Any]]:
-        """写入一个分支的标准结果和单元结果文件，返回 artifact 元数据。"""
+        """写入一个分支的标准结果、单元结果和总阵 SVG 图，返回 artifact 元数据。"""
 
         branch_dir = result_dir / mode
         branch_dir.mkdir(parents=True, exist_ok=True)
         (branch_dir / "total_array.json").write_text(json.dumps(result["total_array"], ensure_ascii=False), encoding="utf-8")
         (branch_dir / "unit_results.json").write_text(json.dumps(result["units"], ensure_ascii=False), encoding="utf-8")
+        (branch_dir / "total_array.svg").write_text(TaskManager._pattern_svg(result["total_array"].get("records", []), f"{mode} total array"), encoding="utf-8")
         return [
             {"name": f"{mode}/total_array.json", "type": "total_array_data", "source": mode, "downloadable": True},
             {"name": f"{mode}/unit_results.json", "type": "unit_data", "source": mode, "downloadable": True},
+            {"name": f"{mode}/total_array.svg", "type": "result_plot", "source": mode, "downloadable": True},
+        ]
+
+    @staticmethod
+    def _pattern_svg(records: list[dict[str, Any]], title: str, series: list[tuple[str, str, list[dict[str, Any]]]] | None = None) -> str:
+        """将 Theta=0° 切面转换为可下载 SVG；参数为记录、标题和可选多序列。"""
+
+        if series is None:
+            series = [(title, "#245bd6", records)]
+        points_by_series: list[tuple[str, str, str]] = []
+        for name, color, source in series:
+            cut = sorted((row for row in source if float(row.get("Theta[deg]", 0)) == 0), key=lambda row: float(row.get("Phi[deg]", 0)))
+            values = [float(row.get("ECP_dB", 0)) for row in cut]
+            if not values:
+                continue
+            low, high = min(values), max(values)
+            span = high - low or 1.0
+            points = " ".join(
+                f"{20 + index * 560 / max(len(values) - 1, 1):.2f},{180 - (value - low) * 150 / span:.2f}"
+                for index, value in enumerate(values)
+            )
+            points_by_series.append((name, color, points))
+        polylines = "".join(f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="2" />' for _, color, points in points_by_series)
+        legend = "".join(f'<text x="20" y="{18 + index * 16}" fill="{color}" font-size="11">{escape(name)}</text>' for index, (name, color, _) in enumerate(points_by_series))
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 210"><title>{escape(title)}</title><rect width="600" height="210" fill="#fbfcfe"/><line x1="20" y1="180" x2="580" y2="180" stroke="#cbd5e1"/>{polylines}{legend}</svg>'
+
+    @staticmethod
+    def _write_comparison(result_dir: Path, prediction: dict[str, Any], validation: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """写入双模式对比图和误差指标，返回公开 comparison 数据及 artifact 元数据。"""
+
+        comparison_dir = result_dir / "comparison"
+        comparison_dir.mkdir(parents=True, exist_ok=True)
+        prediction_records = prediction.get("records", [])
+        validation_records = validation.get("records", [])
+        validation_map = {(row.get("Theta[deg]"), row.get("Phi[deg]")): row for row in validation_records}
+        pairs = [
+            (row, validation_map[(row.get("Theta[deg]"), row.get("Phi[deg]"))])
+            for row in prediction_records
+            if (row.get("Theta[deg]"), row.get("Phi[deg]")) in validation_map
+        ]
+        amp_diffs = [float(pred.get("ECP_dB", 0)) - float(real.get("ECP_dB", 0)) for pred, real in pairs]
+        phase_diffs = [((float(pred.get("ECP_Phase_deg", 0)) - float(real.get("ECP_Phase_deg", 0)) + 180.0) % 360.0) - 180.0 for pred, real in pairs]
+        metrics = {
+            "sample_count": len(pairs),
+            "amp_rmse_dB": math.sqrt(sum(value * value for value in amp_diffs) / len(amp_diffs)) if amp_diffs else None,
+            "amp_mae_dB": sum(abs(value) for value in amp_diffs) / len(amp_diffs) if amp_diffs else None,
+            "phase_rmse_deg": math.sqrt(sum(value * value for value in phase_diffs) / len(phase_diffs)) if phase_diffs else None,
+            "phase_mae_deg": sum(abs(value) for value in phase_diffs) / len(phase_diffs) if phase_diffs else None,
+        }
+        (comparison_dir / "comparison_metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+        (comparison_dir / "total_array_comparison.svg").write_text(
+            TaskManager._pattern_svg(
+                prediction_records,
+                "prediction and validation comparison",
+                [("prediction", "#245bd6", prediction_records), ("validation", "#d65b45", validation_records)],
+            ),
+            encoding="utf-8",
+        )
+        return {"metrics": metrics}, [
+            {"name": "comparison/comparison_metrics.json", "type": "comparison_metrics", "source": "comparison", "downloadable": True},
+            {"name": "comparison/total_array_comparison.svg", "type": "comparison_plot", "source": "comparison", "downloadable": True},
         ]

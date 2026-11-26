@@ -37,6 +37,36 @@ npm run dev
 
 正式服务默认使用真实 HFSS 和参考预测模式。网页绑定时填写 `.aedt` 工程绝对路径，设计名默认 `number1`，点击开始训练后由仓库内 runner 自动生成训练数据并训练模型。开发机测试必须显式设置两个 `stub` 模式变量。
 
+## Windows 服务器部署
+
+1. 将仓库完整复制到服务器，并确认 HFSS 2021、Python 3.12、Node.js/npm 已安装，HFSS 许可证可用。
+2. 在联网机器按 `requirements-server.txt` 下载 Windows/Python 3.12 wheel，复制到服务器的离线目录后安装。
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install --no-index --find-links E:\wheelhouse -r requirements-server.txt
+```
+
+3. 启动后端。首次真实运行不需要设置工程路径、模型路径、平均 ECP 路径或 `hfss.py` 路径。
+
+```powershell
+$env:ARRAYLAB_DATA_ROOT = "E:\ArrayLab\data"
+$env:ARRAYLAB_CLEANUP_ENABLED = "1"
+.venv\Scripts\python.exe -m backend.server
+```
+
+4. 另开终端安装并启动前端。服务器离线时需要提前准备 npm 缓存，或直接复制已安装的 `frontend/node_modules`。
+
+```powershell
+cd frontend
+npm ci --offline
+npm run dev -- --host 127.0.0.1
+```
+
+5. 浏览器打开 `http://127.0.0.1:5173`，填写 `.aedt` 绝对路径并点击绑定。工程路径由网页传给后端，设计名默认为 `number1`。绑定成功后点击开始训练，训练数据、HFSS 导出、ECP/cn 后处理和模型训练由默认 runner 自动执行。
+
+`ARRAYLAB_HFSS_PROJECT_PATH` 只供服务器验收 manifest 脚本使用，不是正常网页运行的必填项。`ARRAYLAB_HFSS_MODULE_PATH`、`ARRAYLAB_HFSS_RUNNER_MODULE_PATH`、`ARRAYLAB_AVERAGE_PATTERN_PATH` 和 `ARRAYLAB_MODEL_PATH` 也有仓库内默认行为，只有替换实现或预置模型时才配置。
+
 ## 开发门禁
 
 ```powershell

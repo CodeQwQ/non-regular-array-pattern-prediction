@@ -21,6 +21,7 @@ from .cleanup import start_cleanup_process
 from .errors import AppError
 from .hfss_adapter import StubHFSSAdapter, UnavailableHFSSAdapter
 from .hfss_real_adapter import RealHFSSAdapter, load_runners
+from .logging_utils import configure_logging
 from .storage import SQLiteStore
 from .task_manager import TaskManager
 from .validation import normalise_array_input
@@ -34,6 +35,7 @@ class Application:
     def __init__(self, settings: Settings | None = None, store: SQLiteStore | None = None) -> None:
         self.settings = settings or Settings.from_env()
         self.settings.ensure_directories()
+        self.logger = configure_logging(self.settings.data_root)
         self.store = store or SQLiteStore(self.settings.db_path)
         self.cleanup_process = start_cleanup_process(self.settings.data_root, self.settings.retention_days) if self.settings.cleanup_enabled else None
         if self.settings.hfss_mode == "stub":

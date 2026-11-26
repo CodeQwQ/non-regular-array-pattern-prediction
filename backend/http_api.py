@@ -44,8 +44,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             else:
                 raise AppError("TASK_FAILED", "接口不存在", 404)
         except AppError as exc:
+            self.app.logger.error("HTTP GET failed path=%s code=%s message=%s", self.path, exc.code, exc.message)
             self._json(exc.to_dict(), exc.status)
         except Exception as exc:  # pragma: no cover
+            self.app.logger.exception("unexpected HTTP GET failure path=%s", self.path)
             self._json({"error": {"code": "INTERNAL_ERROR", "message": str(exc)}}, 500)
 
     def do_POST(self) -> None:  # noqa: N802
@@ -65,10 +67,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 raise AppError("TASK_FAILED", "接口不存在", 404)
             self._json(body, status)
         except AppError as exc:
+            self.app.logger.error("HTTP POST failed path=%s code=%s message=%s", self.path, exc.code, exc.message)
             self._json(exc.to_dict(), exc.status)
         except json.JSONDecodeError:
             self._json({"error": {"code": "INPUT_INVALID", "message": "请求体必须是 JSON"}}, 400)
         except Exception as exc:  # pragma: no cover
+            self.app.logger.exception("unexpected HTTP POST failure path=%s", self.path)
             self._json({"error": {"code": "INTERNAL_ERROR", "message": str(exc)}}, 500)
 
     def _read_json(self) -> dict[str, Any]:
@@ -87,22 +91,28 @@ class RequestHandler(BaseHTTPRequestHandler):
         """写 JSON 响应；参数为响应字典和状态码。"""
 
         raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(raw)))
-        self.end_headers()
-        self.wfile.write(raw)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
 
     def _bytes(self, content: bytes, status: int, content_type: str, filename: str | None = None) -> None:
         """写二进制响应；参数为内容、状态、MIME 类型和可选文件名。"""
 
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(content)))
-        if filename:
-            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(content)))
+            if filename:
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
 
     def log_message(self, format: str, *args: Any) -> None:
         """保留标准日志接口但不输出额外噪声；参数由 BaseHTTPRequestHandler 提供。"""

@@ -21,7 +21,7 @@ test('binds, trains, evaluates, displays and downloads a result', async ({ page 
   await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
   await page.getByRole('button', { name: '开始训练' }).click()
   await expect(page.getByText('模型：ready')).toBeVisible({ timeout: 10_000 })
-  await page.getByLabel('固定 JSON 输入（JSON 是权威来源）').fill(JSON.stringify({ unit_count: 1, units: [{ unit_id: 1, i: 1, j: 1, x: 0, y: 0 }] }))
+  await page.getByLabel('JSON 文本（与手工表同时存在时优先）').fill(JSON.stringify({ unit_count: 1, units: [{ unit_id: 1, i: 1, j: 1, x: 0, y: 0 }] }))
   await page.getByRole('button', { name: '执行所选任务' }).click()
   await expect(page.getByText('succeeded')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('采样点：16471')).toBeVisible({ timeout: 10_000 })
@@ -33,12 +33,24 @@ test('binds, trains, evaluates, displays and downloads a result', async ({ page 
   expect(download.suggestedFilename()).toMatch(/task_evaluation_.*_result\.zip/)
 })
 
+test('submits the manual position table when JSON is absent', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
+  await page.getByRole('button', { name: '绑定工程' }).click()
+  await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
+  await page.getByRole('button', { name: '开始训练' }).click()
+  await expect(page.getByText('模型：ready')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByLabel('第 1 个单元 x 坐标')).toHaveValue('0')
+  await page.getByRole('button', { name: '执行所选任务' }).click()
+  await expect(page.getByText('succeeded')).toBeVisible({ timeout: 10_000 })
+})
+
 test('rejects malformed JSON before creating an evaluation task', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
   await page.getByRole('button', { name: '绑定工程' }).click()
   await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
-  await page.getByLabel('固定 JSON 输入（JSON 是权威来源）').fill('{invalid json')
+  await page.getByLabel('JSON 文本（与手工表同时存在时优先）').fill('{invalid json')
   await page.getByRole('button', { name: '执行所选任务' }).click()
   await expect(page.getByText('阵列输入必须是合法 JSON')).toBeVisible()
 })
@@ -48,7 +60,7 @@ test('shows the backend duplicate-position validation error', async ({ page }) =
   await page.getByLabel('HFSS 工程绝对路径').fill(e2eProject)
   await page.getByRole('button', { name: '绑定工程' }).click()
   await expect(page.getByText('工程绑定成功，等待开始训练。')).toBeVisible()
-  await page.getByLabel('固定 JSON 输入（JSON 是权威来源）').fill(JSON.stringify({
+  await page.getByLabel('JSON 文本（与手工表同时存在时优先）').fill(JSON.stringify({
     unit_count: 2,
     units: [
       { unit_id: 1, i: 1, j: 1, x: 0, y: 0 },

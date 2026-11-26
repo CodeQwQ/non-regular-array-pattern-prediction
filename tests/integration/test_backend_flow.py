@@ -127,6 +127,7 @@ def test_training_prediction_result_and_download(tmp_path: Path):
         assert len(result["total_array_result"]["prediction"]["records"]) == 16471
         metadata = next(path for path in (tmp_path / "data").rglob("metadata.json"))
         metadata_payload = json.loads(metadata.read_text(encoding="utf-8"))
+        assert (tmp_path / "data" / "arraylab.log").is_file()
         assert metadata_payload["project_id"] == project_response["project_id"]
         assert metadata_payload["modes"] == ["prediction"]
         assert metadata_payload["branch_status"] == {"prediction": "succeeded"}
@@ -235,6 +236,35 @@ def test_dual_mode_partial_success_preserves_successful_branch(tmp_path: Path):
         metadata_payload = json.loads(metadata.read_text(encoding="utf-8"))
         assert metadata_payload["branch_status"] == {"prediction": "succeeded", "validation": "failed"}
         assert "validation" in metadata_payload["branch_errors"]
+    finally:
+        app.close()
+
+
+@pytest.mark.integration
+def test_dual_mode_success_persists_comparison_plot_and_metrics(tmp_path: Path):
+    """双模式成功时生成两条曲线 SVG 和可下载误差指标。"""
+
+    aedt = tmp_path / "dual-success.aedt"
+    aedt.write_text("stub", encoding="utf-8")
+    app = Application(Settings("127.0.0.1", 0, tmp_path / "state.sqlite3", tmp_path / "data", "stub", 4, "stub"))
+    try:
+        project, _ = app.create_project({"hfss_project_path": str(aedt)})
+        training, _ = app.start_training(project["project_id"])
+        assert wait_terminal(app, training["task_id"])["status"] == "succeeded"
+        evaluation, _ = app.create_evaluation(
+            project["project_id"],
+            {"input": {"unit_count": 1, "units": [{"unit_id": 1, "i": 1, "j": 1, "x": 0, "y": 0}]}, "modes": ["prediction", "validation"]},
+        )
+        state = wait_terminal(app, evaluation["task_id"])
+        assert state["status"] == "succeeded"
+        result = app.get_results(evaluation["task_id"])
+        assert result["mode"] == "comparison"
+        assert result["comparison"]["metrics"]["sample_count"] == 16471
+        names = {artifact["name"] for artifact in result["files"]}
+        assert "prediction/total_array.svg" in names
+        assert "validation/total_array.svg" in names
+        assert "comparison/total_array_comparison.svg" in names
+        assert "comparison/comparison_metrics.json" in names
     finally:
         app.close()
 
