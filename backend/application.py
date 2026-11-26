@@ -115,6 +115,9 @@ class Application:
         project = self.store.create_project(path, payload.get("project_name"))
         try:
             self.tasks.hfss.bind(path, project.project_id)
+            set_project_name = getattr(self.tasks.hfss, "set_project_name", None)
+            if callable(set_project_name):
+                set_project_name(project.project_id, project.project_name)
         except AppError:
             self.store.update_project(project.project_id, binding_status="invalid", model_status="invalid")
             raise

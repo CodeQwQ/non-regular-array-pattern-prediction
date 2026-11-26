@@ -65,6 +65,7 @@ class RealHFSSAdapter:
         self.validation_runner = validation_runner
         self.runner_context = dict(runner_context or {})
         self._instances: dict[str, Any] = {}
+        self._project_names: dict[str, str] = {}
 
     def _load_class(self):
         """延迟加载实验 HFSS 类；返回 class，失败时抛出 PROJECT_BIND_FAILED。"""
@@ -94,9 +95,15 @@ class RealHFSSAdapter:
         hfss_class = self._load_class()
         try:
             self._instances[project_id] = hfss_class(str(path), self.design_name)
+            self._project_names[project_id] = path.stem
         except Exception as exc:
             raise AppError("PROJECT_BIND_FAILED", f"HFSS 工程加载失败：{exc}", 500) from exc
         return {"project_id": project_id, "mode": self.mode, "path": str(path), "design_name": self.design_name}
+
+    def set_project_name(self, project_id: str, project_name: str) -> None:
+        """登记用户项目名；参数为项目 ID 和显示名，供 runner 保持数据目录一致。"""
+
+        self._project_names[project_id] = project_name
 
     def _instance(self, project_id: str) -> Any:
         """读取已绑定 HFSS 实例；参数为项目 ID，返回 COM 封装实例。"""
@@ -111,7 +118,9 @@ class RealHFSSAdapter:
 
         if self.training_runner is None:
             raise AppError("TASK_FAILED", "真实 HFSS 训练 runner 尚未配置", 500)
-        return self.training_runner(self._instance(project_id), project_id, task_id, dict(self.runner_context))
+        context = dict(self.runner_context)
+        context["project_name"] = self._project_names.get(project_id, project_id)
+        return self.training_runner(self._instance(project_id), project_id, task_id, context)
 
     def run_validation(self, project_id: str, task_id: str, array_input: dict[str, Any]) -> dict[str, Any]:
         """执行注入的真实验证 runner；未注入时明确失败。"""
@@ -120,4 +129,5 @@ class RealHFSSAdapter:
             raise AppError("TASK_FAILED", "真实 HFSS 验证 runner 尚未配置", 500)
         context = dict(self.runner_context)
         context["array_input"] = array_input
+        context["project_name"] = self._project_names.get(project_id, project_id)
         return self.validation_runner(self._instance(project_id), project_id, task_id, context)

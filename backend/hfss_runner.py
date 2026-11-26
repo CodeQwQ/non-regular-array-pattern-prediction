@@ -51,7 +51,8 @@ def _work_dir(context: dict[str, Any] | None, project_id: str, task_id: str, nam
 
     context = context or {}
     root = Path(context.get("data_root") or Path(__file__).resolve().parents[1] / "data")
-    path = root / project_id / "output" / task_id / name
+    project_name = str(context.get("project_name") or project_id)
+    path = root / project_name / "temp" / task_id / name
     path.mkdir(parents=True, exist_ok=True)
     return path
 
