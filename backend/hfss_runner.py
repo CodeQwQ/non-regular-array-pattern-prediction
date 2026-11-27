@@ -265,24 +265,28 @@ def _simulate_training_iteration(hfss: Any, iteration: int, output_root: Path, s
     return features
 
 
-def _run_training_iteration_process(payload: dict[str, Any]) -> tuple[int, list[list[float]]]:
-    """Windows spawn worker：复制工程、运行一次 3×3 HFSS 训练迭代并释放 COM 进程。"""
+def _run_training_chunk_process(payload: dict[str, Any]) -> list[tuple[int, list[list[float]]]]:
+    """Windows spawn worker：一次启动 HFSS Desktop，连续执行一个迭代批次。"""
 
     output_root = Path(payload["output_root"])
-    project_path = str(payload["project_path"])
-    iteration = int(payload["iteration"])
-    slot_root = Path(payload["slot_root"])
-    worker_project = _copy_worker_project(project_path, output_root, f"iteration_{iteration}")
+    worker_project = _copy_worker_project(str(payload["project_path"]), output_root, f"worker_{payload['worker_id']}")
+    iterations = [int(value) for value in payload["iterations"]]
+    results: list[tuple[int, list[list[float]]]] = []
     try:
-        with _acquire_hfss_slot(slot_root):
+        with _acquire_hfss_slot(Path(payload["slot_root"])):
             instance = _create_worker_hfss(str(payload["module_path"]), worker_project, str(payload["design_name"]), output_root)
             try:
-                features = _simulate_training_iteration(instance, iteration, output_root, int(payload["seed"]))
+                for iteration in iterations:
+                    # 与实验 main.py 一样，在重新布局前清理上一轮实体，
+                    # 但整个批次复用同一个 Desktop，避免每次仿真重启 HFSS。
+                    instance.delete(5)
+                    features = _simulate_training_iteration(instance, iteration, output_root, 1000 + iteration)
+                    results.append((iteration, features))
             finally:
                 close = getattr(instance, "close", None)
                 if callable(close):
                     close()
-        return iteration, features
+        return results
     finally:
         try:
             worker_project.unlink(missing_ok=True)
@@ -319,10 +323,11 @@ def _use_process_workers(context: dict[str, Any] | None) -> bool:
 
 
 def _training_iterations_with_processes(instance: Any, context: dict[str, Any], work: Path) -> list[list[float]]:
-    """以 Windows spawn 进程池并行执行 30 次训练迭代，返回按迭代顺序拼接的特征。"""
+    """以 Windows spawn 进程池并行执行 30 次训练迭代，worker 批内复用 Desktop。"""
 
     worker_count = min(4, max(1, int(context.get("max_hfss_workers", 4))))
     slot_root = Path(context.get("data_root") or work.parent.parent.parent) / ".hfss_slots"
+    chunks = [list(range(start, min(start + worker_count, 31))) for start in range(1, 31, worker_count)]
     payloads = [
         {
             "output_root": str(work),
@@ -330,18 +335,18 @@ def _training_iterations_with_processes(instance: Any, context: dict[str, Any], 
             "module_path": str(context["hfss_module_path"]),
             "design_name": str(context.get("hfss_design_name", "number1")),
             "slot_root": str(slot_root),
-            "iteration": iteration,
-            "seed": 1000 + iteration,
+            "worker_id": worker_id,
+            "iterations": iterations,
         }
-        for iteration in range(1, 31)
+        for worker_id, iterations in enumerate(chunks, start=1)
     ]
     spawn_context = multiprocessing.get_context("spawn")
     results: dict[int, list[list[float]]] = {}
     with ProcessPoolExecutor(max_workers=worker_count, mp_context=spawn_context) as executor:
-        futures = [executor.submit(_run_training_iteration_process, payload) for payload in payloads]
+        futures = [executor.submit(_run_training_chunk_process, payload) for payload in payloads]
         for future in futures:
-            iteration, features = future.result()
-            results[iteration] = features
+            for iteration, features in future.result():
+                results[iteration] = features
     return [feature for iteration in range(1, 31) for feature in results[iteration]]
 
 

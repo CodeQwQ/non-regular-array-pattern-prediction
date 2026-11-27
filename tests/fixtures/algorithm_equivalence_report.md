@@ -54,6 +54,6 @@ py -3.12 -m pytest tests/unit/test_algorithm_reference.py tests/unit/test_golden
 
 ### 有意保留的工程差异
 
-HFSS 仿真不再由父进程共享 COM 对象。每个训练迭代和验证任务在 Windows `spawn` worker 中复制工程、创建独立 Desktop、写入隔离输出目录并在 worker 结束前调用 `close()`。这只改变进程和路径隔离方式，不改变训练数据字段、采样网格、公式或模型输入输出。
+HFSS 仿真不再由父进程共享 COM 对象。训练 worker 批次在 Windows `spawn` 进程中复制工程、创建一个独立 Desktop，连续执行多次迭代，在每次迭代之间调用实验同款 `delete(5)` 清理实体并重新布局，批次结束前才调用 `close()`。验证任务使用独立 worker。这个过程只改变进程和路径隔离方式，不改变训练数据字段、采样网格、公式或模型输入输出。
 
 真实工程打开、求解、报告导出、进程计数和数值误差必须在服务器上回填。开发机的 spawn worker 测试只验证进程边界、迭代顺序、复制工程和清理行为，不能替代 COM 数值验收。
