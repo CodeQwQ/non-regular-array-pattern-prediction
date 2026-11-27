@@ -100,6 +100,7 @@
 - 开发机没有合格 HFSS 测试工程时，使用 HFSSAdapter 测试替身完成开发验证；真实 HFSS 集成验收在服务器上执行。
 - 正式服务默认使用真实 HFSS 和参考预测模式。开发测试必须显式注入 `stub` 模式，不能让替身成为交付默认值。
 - 真实训练/验证流程通过 runner 模块注入 `run_training(instance, project_id, task_id, context)` 和 `run_validation(instance, project_id, task_id, context)`。验证输入位于 context 的 `array_input` 字段；缺少任一函数、工程模块或训练产物时任务必须失败，禁止静默回退到替身。
+- 任务编排线程不持有真实 COM 对象。默认 runner 使用 Windows `spawn` 的 `ProcessPoolExecutor` 执行 30 次训练迭代和验证仿真，每个 worker 复制绑定工程、创建独立 HFSS Desktop，完成后关闭 Desktop；数据处理、XGBoost 训练和预测在任务进程内继续执行。数据目录下的四个文件锁槽位保证跨任务全局最多四个 HFSS worker。
 - HFSS 工程路径由 `createProject` 请求从前端传入，设计名称默认 `number1`，后端不把用户工程路径写入固定环境变量。随仓库提供的 `非规则阵列方向图预测项目文件/hfss.py` 只作为默认 COM 适配层。
 
 ### 4.5 技术选型边界
@@ -346,6 +347,7 @@ flowchart TD
 
 - 前端运行在浏览器中；
 - 后端 API 和任务编排运行在主要后端进程中；
+- 后端任务编排允许使用轻量线程等待状态和提交结果，但线程不执行或持有真实 HFSS COM；
 - HFSS 仿真运行在独立 HFSS 工作进程中；
 - 清理任务运行在独立清理子进程中。
 

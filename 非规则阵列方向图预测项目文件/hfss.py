@@ -13,7 +13,7 @@
 #          导出与遗留对象清理等自动化操作，是全部训练/测试数据采集的底层接口。
 # 类/函数清单：
 #   class HFSS —— HFSS 自动化操作封装类
-#     __init__               连接 HFSS 并激活指定项目/设计/3D建模器，可接收任务隔离输出目录
+#     __init__               连接 HFSS 并激活指定项目/设计/3D建模器，可接收任务隔离输出目录和独立 Desktop 标志
 #     move                   将天线单元沿 x/y 方向平移指定距离(mil)
 #     move_xyz               在指定位置创建相对坐标系 RelativeCS（用于定位单元）
 #     Box60                  创建金属地小板 Box60（X/Y 位置与尺寸由传入表达式
@@ -105,9 +105,10 @@ def _validate_exported_csv(file_path, expected_column, min_data_rows=16000):
 
 
 class HFSS:
-    def __init__(self, project_path=r"E:\c50066007\MiRC_Slot_fed_filtenna_throughvias.aedt", design_name="number1", output_root=None):
+    def __init__(self, project_path=r"E:\c50066007\MiRC_Slot_fed_filtenna_throughvias.aedt", design_name="number1", output_root=None, isolated=False):
 
         self.output_root = output_root or _output_root()
+        self._isolated = bool(isolated)
         if not self.output_root.endswith(("/", "\\")):
             self.output_root += os.sep
 
@@ -127,6 +128,8 @@ class HFSS:
         attached_existing = False
 
         try:
+            if self._isolated:
+                raise RuntimeError("isolated worker requires a new Desktop")
             self.oAnsoftApp = client.GetActiveObject(
                 "AnsoftHfss.HfssScriptInterface"
             )
@@ -152,30 +155,34 @@ class HFSS:
         bootstrap_pid = int(
             self._bootstrap_desktop.GetProcessID()
         )
+        self._attached_existing = attached_existing
 
         # ==================== 3. 获取运行实例管理器 ====================
         oRunningInstances = (
             self._bootstrap_desktop.GetRunningInstancesMgr()
         )
 
-        self.oDesktop = None
+        self.oDesktop = self._bootstrap_desktop if self._isolated else None
 
-        # 优先根据工程完整路径寻找Desktop
-        for key in (project_path, project_name):
-            try:
-                candidate = (
-                    oRunningInstances.GetRunningInstanceByProject(key)
-                )
+        # 优先根据工程完整路径寻找Desktop。独立 worker 始终使用自己通过
+        # Dispatch 创建的 Desktop，避免 GetActiveObject/运行实例管理器把多个
+        # worker 重新汇聚到用户已有的同一 HFSS 进程。
+        if not self._isolated:
+            for key in (project_path, project_name):
+                try:
+                    candidate = (
+                        oRunningInstances.GetRunningInstanceByProject(key)
+                    )
 
-                # 验证返回对象确实是可用的Desktop
-                candidate.GetProcessID()
+                    # 验证返回对象确实是可用的Desktop
+                    candidate.GetProcessID()
 
-                self.oDesktop = candidate
-                print(f"找到目标工程对应的Desktop: {key}")
-                break
+                    self.oDesktop = candidate
+                    print(f"找到目标工程对应的Desktop: {key}")
+                    break
 
-            except Exception:
-                continue
+                except Exception:
+                    continue
 
         # ==================== 4. 如果没找到，遍历所有实例 ====================
         if self.oDesktop is None:
@@ -236,6 +243,7 @@ class HFSS:
 
         # ==================== 5. 激活或打开工程 ====================
         target_pid = int(self.oDesktop.GetProcessID())
+        self._owns_desktop = self._isolated or (not attached_existing and target_pid == bootstrap_pid)
 
         self.oDesktop.RestoreWindow()
 
@@ -277,6 +285,16 @@ class HFSS:
                 print("临时Desktop已关闭")
             except Exception as e:
                 print("临时Desktop关闭失败:", e)
+
+    def close(self):
+        """关闭独立 worker Desktop；普通网页绑定的 HFSS Desktop 不由此方法关闭。"""
+
+        if not getattr(self, "_owns_desktop", False):
+            return
+        try:
+            self.oDesktop.QuitApplication()
+        except Exception:
+            pass
 
     def move(self, col_distance=0, row_distance=0):
         """

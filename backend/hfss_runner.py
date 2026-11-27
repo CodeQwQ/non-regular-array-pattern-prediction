@@ -10,8 +10,15 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import math
+import multiprocessing
+import os
 from pathlib import Path
+import shutil
+import time
+from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
 from typing import Any, Iterable
 
 from .algorithm_reference import (
@@ -22,6 +29,7 @@ from .algorithm_reference import (
     SPEED_OF_LIGHT_M_S,
     TEST_GRID_ROWS,
     THETA_VALUES,
+    TRAIN_GRID_COLS,
     TRAIN_GRID_ROWS,
     build_virtual_grid,
     calculate_unit_features,
@@ -44,6 +52,89 @@ def _numpy():
     except ImportError as exc:
         raise RuntimeError("真实 HFSS runner 需要 numpy") from exc
     return np
+
+
+@contextmanager
+def _acquire_hfss_slot(slot_root: Path, slot_count: int = 4):
+    """跨 Windows 子进程占用一个 HFSS 槽位，保证全局不超过四个 COM 实例。"""
+
+    slot_root.mkdir(parents=True, exist_ok=True)
+    handle = None
+    locked = False
+    while not locked:
+        for index in range(slot_count):
+            candidate = slot_root / f"slot_{index}.lock"
+            candidate.touch(exist_ok=True)
+            if candidate.stat().st_size == 0:
+                candidate.write_bytes(b"0")
+            current = candidate.open("r+b")
+            current.seek(0)
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(current.fileno(), msvcrt.LK_NBLCK, 1)
+                else:  # pragma: no cover - Windows 服务器使用 msvcrt
+                    import fcntl
+
+                    fcntl.flock(current.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                handle = current
+                locked = True
+                break
+            except OSError:
+                current.close()
+        if not locked:
+            time.sleep(0.2)
+    try:
+        yield
+    finally:
+        if handle is not None:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:  # pragma: no cover
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
+
+
+def _load_hfss_class(module_path: str):
+    """在 HFSS worker 进程中延迟加载 COM 封装类。"""
+
+    spec = importlib.util.spec_from_file_location("arraylab_worker_hfss", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"无法加载 HFSS 模块：{module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.HFSS
+
+
+def _create_worker_hfss(module_path: str, project_path: Path, design_name: str, output_root: Path):
+    """在 worker 中创建隔离工程实例，兼容旧版两参数 HFSS 构造函数。"""
+
+    hfss_class = _load_hfss_class(module_path)
+    output_value = str(output_root) + ("\\" if os.name == "nt" else "/")
+    try:
+        return hfss_class(str(project_path), design_name, output_root=output_value, isolated=True)
+    except TypeError:
+        instance = hfss_class(str(project_path), design_name)
+        instance.output_root = output_value
+        return instance
+
+
+def _copy_worker_project(project_path: str, output_root: Path, label: str) -> Path:
+    """为单个 HFSS worker 复制工程，避免多个 COM 实例写入同一个 AEDT 文件。"""
+
+    instances = output_root / "hfss_instances"
+    instances.mkdir(parents=True, exist_ok=True)
+    target = instances / f"{label}_{Path(project_path).name}"
+    shutil.copy2(project_path, target)
+    return target
 
 
 def _work_dir(context: dict[str, Any] | None, project_id: str, task_id: str, name: str) -> Path:
@@ -174,14 +265,97 @@ def _simulate_training_iteration(hfss: Any, iteration: int, output_root: Path, s
     return features
 
 
+def _run_training_iteration_process(payload: dict[str, Any]) -> tuple[int, list[list[float]]]:
+    """Windows spawn worker：复制工程、运行一次 3×3 HFSS 训练迭代并释放 COM 进程。"""
+
+    output_root = Path(payload["output_root"])
+    project_path = str(payload["project_path"])
+    iteration = int(payload["iteration"])
+    slot_root = Path(payload["slot_root"])
+    worker_project = _copy_worker_project(project_path, output_root, f"iteration_{iteration}")
+    try:
+        with _acquire_hfss_slot(slot_root):
+            instance = _create_worker_hfss(str(payload["module_path"]), worker_project, str(payload["design_name"]), output_root)
+            try:
+                features = _simulate_training_iteration(instance, iteration, output_root, int(payload["seed"]))
+            finally:
+                close = getattr(instance, "close", None)
+                if callable(close):
+                    close()
+        return iteration, features
+    finally:
+        try:
+            worker_project.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _run_validation_process(payload: dict[str, Any]) -> str:
+    """Windows spawn worker：复制工程、运行一次验证仿真并在进程退出时释放 COM。"""
+
+    output_root = Path(payload["output_root"])
+    worker_project = _copy_worker_project(str(payload["project_path"]), output_root, "validation")
+    try:
+        with _acquire_hfss_slot(Path(payload["slot_root"])):
+            instance = _create_worker_hfss(str(payload["module_path"]), worker_project, str(payload["design_name"]), output_root)
+            try:
+                _simulate_validation(instance, str(payload["iteration"]), output_root, list(payload["units"]))
+            finally:
+                close = getattr(instance, "close", None)
+                if callable(close):
+                    close()
+        return str(output_root)
+    finally:
+        try:
+            worker_project.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _use_process_workers(context: dict[str, Any] | None) -> bool:
+    """判断 runner 上下文是否具备真实 HFSS 多进程所需的工程和模块路径。"""
+
+    return bool(context and context.get("hfss_project_path") and context.get("hfss_module_path"))
+
+
+def _training_iterations_with_processes(instance: Any, context: dict[str, Any], work: Path) -> list[list[float]]:
+    """以 Windows spawn 进程池并行执行 30 次训练迭代，返回按迭代顺序拼接的特征。"""
+
+    worker_count = min(4, max(1, int(context.get("max_hfss_workers", 4))))
+    slot_root = Path(context.get("data_root") or work.parent.parent.parent) / ".hfss_slots"
+    payloads = [
+        {
+            "output_root": str(work),
+            "project_path": str(context["hfss_project_path"]),
+            "module_path": str(context["hfss_module_path"]),
+            "design_name": str(context.get("hfss_design_name", "number1")),
+            "slot_root": str(slot_root),
+            "iteration": iteration,
+            "seed": 1000 + iteration,
+        }
+        for iteration in range(1, 31)
+    ]
+    spawn_context = multiprocessing.get_context("spawn")
+    results: dict[int, list[list[float]]] = {}
+    with ProcessPoolExecutor(max_workers=worker_count, mp_context=spawn_context) as executor:
+        futures = [executor.submit(_run_training_iteration_process, payload) for payload in payloads]
+        for future in futures:
+            iteration, features = future.result()
+            results[iteration] = features
+    return [feature for iteration in range(1, 31) for feature in results[iteration]]
+
+
 def run_training(instance: Any, project_id: str, task_id: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     """执行完整训练流水线并返回模型和平均 ECP 产物路径。"""
 
     np = _numpy()
     work = _work_dir(context, project_id, task_id, "training")
-    all_features: list[list[float]] = []
-    for iteration in range(1, 31):
-        all_features.extend(_simulate_training_iteration(instance, iteration, work, seed=1000 + iteration))
+    if _use_process_workers(context):
+        all_features = _training_iterations_with_processes(instance, context or {}, work)
+    else:
+        all_features = []
+        for iteration in range(1, 31):
+            all_features.extend(_simulate_training_iteration(instance, iteration, work, seed=1000 + iteration))
 
     ecp_dir = work / "ecp_single"
     ecp_dir.mkdir(parents=True, exist_ok=True)
@@ -271,7 +445,21 @@ def run_validation(instance: Any, project_id: str, task_id: str, context: dict[s
         raise ValueError("验证 runner 缺少规范化 units")
     work = _work_dir(context, project_id, task_id, "validation")
     iteration = f"validation_{task_id}"
-    _simulate_validation(instance, iteration, work, units)
+    if _use_process_workers(context):
+        payload = {
+            "output_root": str(work),
+            "project_path": str(context["hfss_project_path"]),
+            "module_path": str(context["hfss_module_path"]),
+            "design_name": str(context.get("hfss_design_name", "number1")),
+            "slot_root": str(Path(context.get("data_root") or work.parent.parent.parent) / ".hfss_slots"),
+            "iteration": iteration,
+            "units": units,
+        }
+        spawn_context = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=1, mp_context=spawn_context) as executor:
+            executor.submit(_run_validation_process, payload).result()
+    else:
+        _simulate_validation(instance, iteration, work, units)
     patterns: list[list[dict[str, float]]] = []
     for group in range(1, len(units) + 1):
         phi, theta, ecp = _ecp_from_exports(work, iteration, group)

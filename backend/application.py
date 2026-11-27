@@ -47,7 +47,11 @@ class Application:
                 self.settings.hfss_design_name,
                 training_runner=training_runner,
                 validation_runner=validation_runner,
-                runner_context={"data_root": str(self.settings.data_root)},
+                runner_context={
+                    "data_root": str(self.settings.data_root),
+                    "max_hfss_workers": self.settings.max_hfss_workers,
+                    "hfss_design_name": self.settings.hfss_design_name,
+                },
             )
         else:
             adapter = UnavailableHFSSAdapter()

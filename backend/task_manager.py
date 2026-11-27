@@ -28,7 +28,12 @@ from .storage import SQLiteStore
 
 
 class TaskManager:
-    """后台任务编排器；线程池容量由 Settings 限制为最多 4。"""
+    """后台任务编排器。
+
+    这里的轻量线程只负责 HTTP 任务状态、SQLite 更新和结果提交，不持有 HFSS
+    COM 对象。真实训练/验证 runner 在独立的 Windows spawn 进程中创建并释放
+    HFSS Desktop，进程数由 runner 的四个文件锁槽位统一限制。
+    """
 
     def __init__(
         self,
@@ -377,12 +382,51 @@ class TaskManager:
         ]
         amp_diffs = [float(pred.get("ECP_dB", 0)) - float(real.get("ECP_dB", 0)) for pred, real in pairs]
         phase_diffs = [((float(pred.get("ECP_Phase_deg", 0)) - float(real.get("ECP_Phase_deg", 0)) + 180.0) % 360.0) - 180.0 for pred, real in pairs]
+        cut_metrics: dict[str, dict[str, float | None]] = {}
+        for cut_phi in (0.0, 44.0, 90.0):
+            cut_pairs = [
+                (pred, real)
+                for pred, real in pairs
+                if float(pred.get("Phi[deg]", -1)) == cut_phi and float(pred.get("Theta[deg]", 999)) <= 90.0
+            ]
+            if not cut_pairs:
+                continue
+            real_db = [float(real.get("ECP_dB", 0)) for _, real in cut_pairs]
+            pred_db = [float(pred.get("ECP_dB", 0)) for pred, _ in cut_pairs]
+            real_phase = [float(real.get("ECP_Phase_deg", 0)) for _, real in cut_pairs]
+            pred_phase = [float(pred.get("ECP_Phase_deg", 0)) for pred, _ in cut_pairs]
+            theta = [float(real.get("Theta[deg]", 0)) for _, real in cut_pairs]
+            ref_index = max(range(len(real_db)), key=real_db.__getitem__)
+            offset = ((real_phase[ref_index] - pred_phase[ref_index] + 180.0) % 360.0) - 180.0
+            pred_aligned = [phase + offset for phase in pred_phase]
+            real_wrapped = [((phase + 180.0) % 360.0) - 180.0 for phase in real_phase]
+            pred_wrapped = [((phase + 180.0) % 360.0) - 180.0 for phase in pred_aligned]
+            pred_complex = [10.0 ** (db / 20.0) * complex(math.cos(math.radians(phase)), math.sin(math.radians(phase))) for db, phase in zip(pred_db, pred_phase)]
+            real_complex = [10.0 ** (db / 20.0) * complex(math.cos(math.radians(phase)), math.sin(math.radians(phase))) for db, phase in zip(real_db, real_phase)]
+            real_amplitude = [abs(value) for value in real_complex]
+            pred_amplitude = [abs(value) for value in pred_complex]
+            real_mean = sum(real_amplitude) / len(real_amplitude)
+            pred_mean = sum(pred_amplitude) / len(pred_amplitude)
+            covariance = sum((left - pred_mean) * (right - real_mean) for left, right in zip(pred_amplitude, real_amplitude))
+            pred_std = math.sqrt(sum((value - pred_mean) ** 2 for value in pred_amplitude))
+            real_std = math.sqrt(sum((value - real_mean) ** 2 for value in real_amplitude))
+            cut_metrics[str(int(cut_phi))] = {
+                "align_theta_deg": theta[ref_index],
+                "phase_offset_deg": offset,
+                "amp_rmse_dB": math.sqrt(sum((pred - real) ** 2 for pred, real in zip(pred_db, real_db)) / len(real_db)),
+                "amp_mae_dB": sum(abs(pred - real) for pred, real in zip(pred_db, real_db)) / len(real_db),
+                "phase_rmse_deg": math.sqrt(sum((pred - real) ** 2 for pred, real in zip(pred_wrapped, real_wrapped)) / len(real_wrapped)),
+                "phase_mae_deg": sum(abs(pred - real) for pred, real in zip(pred_wrapped, real_wrapped)) / len(real_wrapped),
+                "corr_amp": covariance / (pred_std * real_std) if pred_std and real_std else None,
+                "rel_l2": math.sqrt(sum(abs(pred - real) ** 2 for pred, real in zip(pred_complex, real_complex))) / math.sqrt(sum(abs(real) ** 2 for real in real_complex)) if any(real_complex) else None,
+            }
         metrics = {
             "sample_count": len(pairs),
             "amp_rmse_dB": math.sqrt(sum(value * value for value in amp_diffs) / len(amp_diffs)) if amp_diffs else None,
             "amp_mae_dB": sum(abs(value) for value in amp_diffs) / len(amp_diffs) if amp_diffs else None,
             "phase_rmse_deg": math.sqrt(sum(value * value for value in phase_diffs) / len(phase_diffs)) if phase_diffs else None,
             "phase_mae_deg": sum(abs(value) for value in phase_diffs) / len(phase_diffs) if phase_diffs else None,
+            "cuts": cut_metrics,
         }
         (comparison_dir / "comparison_metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
         (comparison_dir / "total_array_comparison.svg").write_text(

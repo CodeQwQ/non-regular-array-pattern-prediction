@@ -63,9 +63,13 @@ class RealHFSSAdapter:
         self.design_name = design_name
         self.training_runner = training_runner
         self.validation_runner = validation_runner
+        self._runner_owns_hfss_process = bool(
+            training_runner is not None and getattr(training_runner, "__module__", "") == "backend.hfss_runner"
+        )
         self.runner_context = dict(runner_context or {})
         self._instances: dict[str, Any] = {}
         self._project_names: dict[str, str] = {}
+        self._project_paths: dict[str, str] = {}
 
     def _load_class(self):
         """延迟加载实验 HFSS 类；返回 class，失败时抛出 PROJECT_BIND_FAILED。"""
@@ -96,6 +100,7 @@ class RealHFSSAdapter:
         try:
             self._instances[project_id] = hfss_class(str(path), self.design_name)
             self._project_names[project_id] = path.stem
+            self._project_paths[project_id] = str(path)
         except Exception as exc:
             raise AppError("PROJECT_BIND_FAILED", f"HFSS 工程加载失败：{exc}", 500) from exc
         return {"project_id": project_id, "mode": self.mode, "path": str(path), "design_name": self.design_name}
@@ -120,7 +125,16 @@ class RealHFSSAdapter:
             raise AppError("TASK_FAILED", "真实 HFSS 训练 runner 尚未配置", 500)
         context = dict(self.runner_context)
         context["project_name"] = self._project_names.get(project_id, project_id)
-        return self.training_runner(self._instance(project_id), project_id, task_id, context)
+        context["hfss_project_path"] = self._project_paths[project_id]
+        context["hfss_module_path"] = str(self.module_path)
+        context["hfss_design_name"] = self.design_name
+        instance = self._instance(project_id)
+        if self._runner_owns_hfss_process:
+            close = getattr(instance, "close", None)
+            if callable(close):
+                close()
+            instance = None
+        return self.training_runner(instance, project_id, task_id, context)
 
     def run_validation(self, project_id: str, task_id: str, array_input: dict[str, Any]) -> dict[str, Any]:
         """执行注入的真实验证 runner；未注入时明确失败。"""
@@ -130,4 +144,13 @@ class RealHFSSAdapter:
         context = dict(self.runner_context)
         context["array_input"] = array_input
         context["project_name"] = self._project_names.get(project_id, project_id)
-        return self.validation_runner(self._instance(project_id), project_id, task_id, context)
+        context["hfss_project_path"] = self._project_paths[project_id]
+        context["hfss_module_path"] = str(self.module_path)
+        context["hfss_design_name"] = self.design_name
+        instance = self._instance(project_id)
+        if self._runner_owns_hfss_process:
+            close = getattr(instance, "close", None)
+            if callable(close):
+                close()
+            instance = None
+        return self.validation_runner(instance, project_id, task_id, context)
