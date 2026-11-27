@@ -384,7 +384,9 @@ def run_training(instance: Any, project_id: str, task_id: str, context: dict[str
 
     z = _build_z(np.asarray(average_pattern, dtype=complex), theta_values, phi_values)
     cn_samples = [
-        [complex(value) for value in np.linalg.solve(z.conj().T @ z, z.conj().T @ ecp)]
+        # 保持实验 `求3D_cn_4.py` 的正规方程实现和矩阵求逆口径，不在
+        # 训练标签生成阶段替换为其他分解算法。
+        [complex(value) for value in np.linalg.inv(z.conj().T @ z) @ z.conj().T @ ecp]
         for ecp in ecp_samples
     ]
 
