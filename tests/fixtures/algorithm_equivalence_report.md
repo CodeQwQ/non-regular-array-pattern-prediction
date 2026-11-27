@@ -46,7 +46,7 @@ py -3.12 -m pytest tests/unit/test_algorithm_reference.py tests/unit/test_golden
 | ECP | `rEtheta*cos(phi-45)-rEphi*sin(phi-45)` | `polarized_ecp` | 公式和字段顺序等价 |
 | 复数平均 | 270 组复数 ECP 求平均 | `average += ecp` 后除以 270 | 等价 |
 | Z 矩阵 | `G @ E`，中心补偿 `-2`，25 虚拟阵元、27.5 GHz、0.005 m 间距 | `_build_z` 向量化实现 | 相位公式和虚拟阵元顺序等价，黄金 Z 夹具覆盖 |
-| cn 求解 | `inv(ZᴴZ) @ Zᴴg` | `solve(ZᴴZ, Zᴴg)` | 数学解等价，数值实现更稳定；真实数据需记录浮点差异 |
+| cn 求解 | `inv(ZᴴZ) @ Zᴴg` | runner 训练标签生成已恢复为 `inv(ZᴴZ) @ Zᴴg`；纯函数夹具仍使用带主元求解避免大矩阵求逆 | 训练标签口径与实验脚本一致；纯函数夹具只验证数学结果 |
 | XGBoost | 9 列输入、2 列 cn、500/0.1/8/42 | `XGBoostCnModel` 使用相同参数 | 参数和列语义等价 |
 | 预测 | 8 特征 + element_id 1～25，`Z @ cn`，ECP 幅相 | `ReferencePredictionEngine` | 预测链路和字段语义等价，黄金夹具覆盖纯算法 |
 | 总阵 | 单元 ECP 按位置因子复数合成，幅值视图线性求和 | `synthesize_total_field` | 实验计划 011 口径等价 |
